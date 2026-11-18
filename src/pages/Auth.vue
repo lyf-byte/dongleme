@@ -1,0 +1,390 @@
+<script setup>
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowRight, Eye, EyeOff, Lock, ShieldCheck, UserRound } from 'lucide-vue-next'
+import { supabase, isConfigured } from '../utils/supabase'
+
+const route = useRoute()
+const router = useRouter()
+
+const mode = ref('login')
+const form = ref({ account: '', password: '', confirm: '' })
+const agreed = ref(false)
+const loading = ref(false)
+const errorText = ref('')
+const showPassword = ref(false)
+
+const PHONE_RE = /^1[3-9]\d{9}$/
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const accountType = computed(() => {
+  const value = form.value.account.trim()
+  if (PHONE_RE.test(value)) return 'phone'
+  if (EMAIL_RE.test(value)) return 'email'
+  return ''
+})
+
+const accountHint = computed(() => {
+  if (accountType.value === 'phone') return '手机号仅作为账号标识，不发送短信验证码'
+  if (accountType.value === 'email') return '将使用邮箱作为登录账号'
+  return '支持手机号或邮箱，输入后自动识别'
+})
+
+const submitText = computed(() => {
+  if (loading.value) return '请稍候…'
+  const label =
+    accountType.value === 'phone' ? '手机号' : accountType.value === 'email' ? '邮箱' : ''
+  return mode.value === 'login' ? `${label}登录` : `${label}注册`
+})
+
+function setMode(value) {
+  mode.value = value
+  errorText.value = ''
+}
+
+function mapError(message = '') {
+  const text = message.toLowerCase()
+  if (text.includes('already registered') || text.includes('already been registered')) {
+    if (accountType.value === 'phone') return '该手机号已注册，请直接登录'
+    if (accountType.value === 'email') return '该邮箱已注册，请直接登录'
+    return '该账号已注册，请直接登录'
+  }
+  if (text.includes('invalid login credentials')) return '账号或密码错误'
+  if (text.includes('password should be at least')) return '密码至少 6 位'
+  if (text.includes('email not confirmed')) return '邮箱尚未验证，请到邮箱完成验证'
+  if (text.includes('email address') && text.includes('invalid')) {
+    return '这个邮箱地址不可用，请换一个常用邮箱'
+  }
+  if (text.includes('unable to validate email')) return '手机号或邮箱格式不正确'
+  if (text.includes('rate limit') || text.includes('too many')) return '操作太频繁，请稍后再试'
+  if (text.includes('fetch')) return '网络异常，请检查网络后重试'
+  return message || '操作失败，请稍后再试'
+}
+
+function validate() {
+  const account = form.value.account.trim()
+  if (!account) return '请输入手机号或邮箱'
+  if (!accountType.value) return '请输入正确的手机号或邮箱地址'
+  if (form.value.password.length < 6) return '密码至少 6 位'
+  if (mode.value === 'register' && form.value.password !== form.value.confirm) {
+    return '两次输入的密码不一致'
+  }
+  if (mode.value === 'register' && !agreed.value) return '请先勾选用户协议'
+  return ''
+}
+
+async function afterAuth(session) {
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
+  const onboarded = session?.user?.user_metadata?.onboarded === true
+  if (!onboarded) {
+    router.replace({ path: '/onboarding', query: redirect ? { redirect } : {} })
+    return
+  }
+  router.replace(redirect || '/')
+}
+
+async function onSubmit() {
+  errorText.value = ''
+  if (!isConfigured) {
+    errorText.value = '尚未配置 Supabase，请先填写 .env 并重启项目'
+    return
+  }
+  const message = validate()
+  if (message) {
+    errorText.value = message
+    return
+  }
+
+  loading.value = true
+  try {
+    const account = form.value.account.trim()
+    const isPhone = accountType.value === 'phone'
+    const email = isPhone ? `${account}@phone.dlm.app` : account
+
+    if (mode.value === 'register') {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: form.value.password,
+        options: {
+          data: isPhone
+            ? { phone: account, login_type: 'phone', onboarded: false }
+            : { login_type: 'email', onboarded: false }
+        }
+      })
+      if (error) throw error
+      if (!data.session) {
+        errorText.value = '注册成功，但当前需要邮箱验证。请在 Supabase 关闭 Confirm email 后再试'
+        return
+      }
+      await afterAuth(data.session)
+    } else {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password: form.value.password
+      })
+      if (error) throw error
+      await afterAuth(data.session)
+    }
+  } catch (error) {
+    errorText.value = mapError(error?.message || '')
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+<template>
+  <div class="auth">
+    <header class="auth-hero">
+      <span class="auth-orb auth-orb--a"></span>
+      <span class="auth-orb auth-orb--b"></span>
+      <div class="auth-logo">动</div>
+      <h1>动了没</h1>
+      <p>每天动一点，连续看得见</p>
+      <div class="auth-tags">
+        <span class="chip chip--blue">连续打卡</span>
+        <span class="chip chip--yellow">校园排行</span>
+        <span class="chip chip--green">AI 小结</span>
+      </div>
+    </header>
+
+    <main class="auth-card">
+      <div class="segmented auth-tabs">
+        <button
+          type="button"
+          :class="{ active: mode === 'login' }"
+          @click="setMode('login')"
+        >
+          登录
+        </button>
+        <button
+          type="button"
+          :class="{ active: mode === 'register' }"
+          @click="setMode('register')"
+        >
+          注册
+        </button>
+      </div>
+
+      <form @submit.prevent="onSubmit">
+        <div class="form-card">
+          <div class="form-row auth-row">
+            <UserRound class="auth-row__icon" :size="18" />
+            <input
+              v-model="form.account"
+              type="text"
+              placeholder="手机号或邮箱"
+              autocomplete="username"
+            />
+            <span v-if="accountType" class="chip chip--blue">
+              {{ accountType === 'phone' ? '手机号' : '邮箱' }}
+            </span>
+          </div>
+
+          <div class="form-row auth-row">
+            <Lock class="auth-row__icon" :size="18" />
+            <input
+              v-model="form.password"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="密码（至少 6 位）"
+              autocomplete="current-password"
+            />
+            <button
+              type="button"
+              class="auth-eye"
+              @click="showPassword = !showPassword"
+            >
+              <EyeOff v-if="showPassword" :size="18" />
+              <Eye v-else :size="18" />
+            </button>
+          </div>
+
+          <div v-if="mode === 'register'" class="form-row auth-row">
+            <ShieldCheck class="auth-row__icon" :size="18" />
+            <input
+              v-model="form.confirm"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="再次输入密码"
+              autocomplete="new-password"
+            />
+          </div>
+        </div>
+
+        <p class="auth-hint">{{ accountHint }}</p>
+
+        <label v-if="mode === 'register'" class="check">
+          <input v-model="agreed" type="checkbox" />
+          <span>我已阅读并同意《用户协议》与《隐私说明》</span>
+        </label>
+
+        <p v-if="errorText" class="form-error">{{ errorText }}</p>
+
+        <div v-if="!isConfigured" class="notice">
+          未配置 Supabase：把 <code>.env.example</code> 复制为 <code>.env</code>，填入项目地址与
+          anon key 后重启。
+        </div>
+
+        <button class="btn-primary auth-submit" type="submit" :disabled="loading || !isConfigured">
+          <span>{{ submitText }}</span>
+          <ArrowRight :size="18" />
+        </button>
+      </form>
+
+      <p class="auth-switch">
+        {{ mode === 'login' ? '还没有账号？' : '已经有账号了？' }}
+        <button type="button" @click="setMode(mode === 'login' ? 'register' : 'login')">
+          {{ mode === 'login' ? '立即注册' : '去登录' }}
+        </button>
+      </p>
+    </main>
+
+    <p class="auth-foot">校园运动打卡 · 让坚持有迹可循</p>
+  </div>
+</template>
+
+<style scoped>
+.auth {
+  min-height: 100vh;
+  padding: 0 20px calc(28px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, #eaf1ff 0%, #f2f4f8 46%);
+  overflow: hidden;
+}
+
+.auth-hero {
+  position: relative;
+  padding: 56px 4px 26px;
+}
+
+.auth-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.auth-orb--a {
+  width: 190px;
+  height: 190px;
+  right: -70px;
+  top: -50px;
+  background: rgba(47, 107, 255, 0.1);
+}
+
+.auth-orb--b {
+  width: 90px;
+  height: 90px;
+  right: 44px;
+  top: 120px;
+  background: rgba(246, 178, 27, 0.16);
+}
+
+.auth-logo {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 26px;
+  font-weight: 700;
+  box-shadow: 0 10px 24px rgba(47, 107, 255, 0.28);
+}
+
+.auth-hero h1 {
+  position: relative;
+  margin: 16px 0 6px;
+  font-size: 32px;
+  line-height: 38px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.auth-hero p {
+  position: relative;
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.auth-tags {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.auth-card {
+  position: relative;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.auth-tabs {
+  margin-bottom: 16px;
+}
+
+.auth-row {
+  padding: 13px 14px;
+}
+
+.auth-row__icon {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.auth-row input {
+  text-align: left;
+  font-weight: 400;
+}
+
+.auth-eye {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.auth-hint {
+  margin: 10px 4px 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--muted);
+}
+
+.auth-submit {
+  margin-top: 18px;
+}
+
+.auth-switch {
+  margin: 16px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.auth-switch button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-foot {
+  margin: 22px 0 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+</style>
