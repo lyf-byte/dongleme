@@ -8,6 +8,8 @@
 - 后台入口：<https://donglemei-lyf.netlify.app/admin/login>
 - Supabase 代理：<https://donglemei-lyf.netlify.app/.netlify/functions/supabase-proxy>
 
+推送到 GitHub `main` 分支会自动触发 Netlify 构建部署。
+
 本地开发同样可访问 `http://127.0.0.1:8888`，前后端都已切到上面的代理地址。
 
 ## 技术栈
