@@ -100,9 +100,9 @@ async function onSubmit() {
   <div class="auth">
     <header class="auth-hero">
       <div class="auth-brand">
-        <img class="auth-logo" src="/logo.svg" alt="动了没" />
+        <img class="auth-logo" src="/logo.svg" alt="动了么" />
         <div>
-          <h1>动了没</h1>
+          <h1>动了么</h1>
           <p>每天动一点，连续看得见</p>
         </div>
       </div>

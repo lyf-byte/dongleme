@@ -53,9 +53,9 @@ async function submit() {
 <template>
   <div class="admin-login">
     <div class="admin-login__card">
-      <img class="admin-login__logo" src="/logo.svg" alt="动了没" />
+      <img class="admin-login__logo" src="/logo.svg" alt="动了么" />
       <h1>后台管理</h1>
-      <p>动了没 · 管理员登录</p>
+      <p>动了么 · 管理员登录</p>
 
       <form @submit.prevent="submit">
         <div class="form-card">

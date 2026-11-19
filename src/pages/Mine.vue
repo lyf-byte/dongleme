@@ -318,7 +318,7 @@ onMounted(load)
         退出登录
       </button>
 
-      <p class="version">动了没 · v1.0.0</p>
+      <p class="version">动了么 · v1.0.0</p>
     </template>
   </div>
 </template>

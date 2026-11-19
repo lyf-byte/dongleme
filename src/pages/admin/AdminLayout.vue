@@ -49,7 +49,7 @@ onMounted(() => {
       <div class="admin-brand">
         <img class="admin-brand__logo" src="/logo.svg" alt="" aria-hidden="true" />
         <div>
-          动了没
+          动了么
           <span>ADMIN CONSOLE</span>
         </div>
       </div>

@@ -2,7 +2,7 @@
   "name": "donglemei",
   "private": true,
   "version": "1.0.0",
-  "description": "动了没 - 校园运动打卡",
+  "description": "动了么 - 校园运动打卡",
   "engines": {
     "node": ">=22"
   },

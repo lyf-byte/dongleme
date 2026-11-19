@@ -137,7 +137,7 @@ const server = http.createServer((req, res) => {
 })
 
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`\n  动了没 · 本地全栈已启动`)
+  console.log(`\n  动了么 · 本地全栈已启动`)
   console.log(`  http://127.0.0.1:${PORT}/\n`)
   console.log('  前端：dist 构建产物')
   console.log('  接口：/.netlify/functions/*（MySQL）\n')

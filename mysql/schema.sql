@@ -1,4 +1,4 @@
--- 「动了没」MySQL 8 数据库结构
+-- 「动了么」MySQL 8 数据库结构
 -- 在服务器上执行：sudo mysql < mysql/schema.sql
 
 CREATE DATABASE IF NOT EXISTS donglemei

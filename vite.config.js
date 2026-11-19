@@ -10,8 +10,8 @@ export default defineConfig({
       injectRegister: 'script',
       includeAssets: ['pwa-192.png', 'pwa-512.png'],
       manifest: {
-        name: '动了没',
-        short_name: '动了没',
+        name: '动了么',
+        short_name: '动了么',
         description: '校园运动打卡，每天动一点，连续看得见',
         lang: 'zh-CN',
         theme_color: '#F2F4F8',
