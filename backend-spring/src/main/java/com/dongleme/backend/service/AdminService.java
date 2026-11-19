@@ -26,6 +26,7 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -126,6 +127,18 @@ public class AdminService {
         return new AdminRankView(list);
     }
 
+    public List<String> types() {
+        return recordMapper.selectObjs(
+                        Wrappers.<CheckinRecord>query()
+                                .select("distinct type")
+                                .orderByAsc("type"))
+                .stream()
+                .filter(Objects::nonNull)
+                .map(String::valueOf)
+                .filter(type -> !type.isBlank())
+                .toList();
+    }
+
     public Map<String, Object> delete(String action, String id, String currentUserId) {
         if (id == null || id.isBlank()) {
             throw ApiException.badRequest("缺少 id");
@@ -149,14 +162,47 @@ public class AdminService {
             } catch (NumberFormatException exception) {
                 throw ApiException.notFound("记录不存在");
             }
-            int affected = recordMapper.deleteById(recordId);
-            if (affected == 0) {
+            CheckinRecord record = recordMapper.selectById(recordId);
+            if (record == null) {
                 throw ApiException.notFound("记录不存在");
             }
+            recordMapper.deleteById(recordId);
+            recalculateStreak(record.getUserId());
             return Map.of("ok", true);
         }
 
         throw new ApiException(HttpStatus.NOT_FOUND, "未知的后台操作");
+    }
+
+    private void recalculateStreak(String userId) {
+        List<CheckinRecord> rows = recordMapper.selectList(
+                Wrappers.<CheckinRecord>lambdaQuery()
+                        .eq(CheckinRecord::getUserId, userId));
+
+        Set<LocalDate> dates = rows.stream()
+                .map(CheckinRecord::getDate)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        if (dates.isEmpty()) {
+            userMapper.update(null, Wrappers.<User>lambdaUpdate()
+                    .eq(User::getId, userId)
+                    .set(User::getStreak, 0)
+                    .set(User::getLastCheckDate, null));
+            return;
+        }
+
+        LocalDate latest = dates.stream().max(LocalDate::compareTo).orElseThrow();
+        int streak = 1;
+        for (LocalDate cursor = latest.minusDays(1); dates.contains(cursor); cursor = cursor.minusDays(1)) {
+            streak++;
+        }
+
+        User patch = new User();
+        patch.setId(userId);
+        patch.setStreak(streak);
+        patch.setLastCheckDate(latest);
+        userMapper.updateById(patch);
     }
 
     private AdminUserView toUserView(AdminUserRow row) {

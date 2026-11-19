@@ -10,6 +10,7 @@ public record SummaryView(
         @JsonInclude(JsonInclude.Include.ALWAYS) String content,
         boolean cached,
         Boolean degraded,
-        Boolean empty
+        Boolean empty,
+        Boolean stale
 ) {
 }

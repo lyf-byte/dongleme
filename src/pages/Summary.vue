@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Copy, RefreshCw, Sparkles } from 'lucide-vue-next'
+import { Copy, Download, RefreshCw, Sparkles } from 'lucide-vue-next'
 import { generateSummary, errorMessage } from '../utils/api'
 import { toast } from '../utils/ui'
 import emptySummary from '../assets/empty-summary.svg'
@@ -11,6 +11,7 @@ const content = ref('')
 const weekStart = ref('')
 const cached = ref(false)
 const degraded = ref(false)
+const stale = ref(false)
 const errorText = ref('')
 
 const weekLabel = computed(() => {
@@ -30,6 +31,7 @@ async function peek() {
     if (result.content) {
       content.value = result.content
       cached.value = result.cached
+      stale.value = Boolean(result.stale)
     }
   } catch {
     /* 首次进入不打断用户 */
@@ -48,6 +50,7 @@ async function generate(force = false) {
     content.value = result.content || ''
     cached.value = Boolean(result.cached)
     degraded.value = Boolean(result.degraded)
+    stale.value = false
     if (!result.content) errorText.value = '本周还没有可总结的数据，先去打卡吧'
   } catch (error) {
     errorText.value = errorMessage(error, '生成失败，请稍后再试')
@@ -63,6 +66,120 @@ async function copy() {
   } catch {
     toast('复制失败，请长按选择文本')
   }
+}
+
+function wrapLines(ctx, text, maxWidth) {
+  const lines = []
+  let line = ''
+  for (const char of text) {
+    if (char === '\n') {
+      lines.push(line)
+      line = ''
+      continue
+    }
+    if (ctx.measureText(line + char).width > maxWidth) {
+      lines.push(line)
+      line = char
+    } else {
+      line += char
+    }
+  }
+  if (line) lines.push(line)
+  return lines
+}
+
+function drawRoundRect(ctx, x, y, width, height, radius) {
+  if (typeof ctx.roundRect === 'function') {
+    ctx.beginPath()
+    ctx.roundRect(x, y, width, height, radius)
+    return
+  }
+  ctx.beginPath()
+  ctx.moveTo(x + radius, y)
+  ctx.arcTo(x + width, y, x + width, y + height, radius)
+  ctx.arcTo(x + width, y + height, x, y + height, radius)
+  ctx.arcTo(x, y + height, x, y, radius)
+  ctx.arcTo(x, y, x + width, y, radius)
+  ctx.closePath()
+}
+
+function savePoster() {
+  if (!content.value) return
+
+  const canvas = document.createElement('canvas')
+  const width = 750
+  const height = 1000
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    toast('当前浏览器不支持生成海报')
+    return
+  }
+
+  const background = ctx.createLinearGradient(0, 0, width, height)
+  background.addColorStop(0, '#2f6bff')
+  background.addColorStop(1, '#16337f')
+  ctx.fillStyle = background
+  ctx.fillRect(0, 0, width, height)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'
+  ctx.beginPath()
+  ctx.arc(640, 150, 190, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(90, 900, 160, 0, Math.PI * 2)
+  ctx.fill()
+
+  const font = "'PingFang SC', 'Microsoft YaHei', sans-serif"
+  ctx.fillStyle = 'rgba(255,255,255,0.78)'
+  ctx.font = `28px ${font}`
+  ctx.fillText('动了么 · 校园运动打卡', 64, 96)
+
+  ctx.fillStyle = '#ffffff'
+  ctx.font = `bold 56px ${font}`
+  ctx.fillText('本周小结', 64, 182)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.82)'
+  ctx.font = `30px ${font}`
+  ctx.fillText(weekLabel.value || '', 64, 234)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.12)'
+  drawRoundRect(ctx, 48, 286, width - 96, 556, 32)
+  ctx.fill()
+
+  ctx.fillStyle = '#ffffff'
+  ctx.font = `30px ${font}`
+  const lines = wrapLines(
+    ctx,
+    content.value.replace(/\s+/g, ' ').trim(),
+    width - 96 - 96
+  ).slice(0, 10)
+  let y = 356
+  for (const line of lines) {
+    ctx.fillText(line, 96, y)
+    y += 46
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.72)'
+  ctx.font = `26px ${font}`
+  ctx.fillText('每天动一点，连续看得见', 64, 922)
+
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      toast('海报生成失败')
+      return
+    }
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `dongleme-${weekStart.value || 'summary'}.png`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    toast('海报已保存')
+  }, 'image/png')
 }
 
 onMounted(peek)
@@ -97,6 +214,10 @@ onMounted(peek)
 
         <p class="report-text">{{ content }}</p>
 
+        <p v-if="stale" class="report-note">
+          本周有新打卡记录，建议重新生成小结。
+        </p>
+
         <p v-if="degraded" class="report-note">
           AI 服务暂时不可用，以上为根据数据生成的兜底建议。
         </p>
@@ -105,6 +226,10 @@ onMounted(peek)
           <button type="button" class="btn-primary btn-sm btn-secondary" @click="copy">
             <Copy :size="16" />
             复制
+          </button>
+          <button type="button" class="btn-primary btn-sm btn-secondary" @click="savePoster">
+            <Download :size="16" />
+            保存海报
           </button>
           <button
             type="button"

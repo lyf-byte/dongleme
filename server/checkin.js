@@ -14,7 +14,8 @@ const MET = {
   骑行: 7.5,
   跳绳: 12.3,
   游泳: 6.0,
-  力量训练: 5.5
+  力量训练: 5.5,
+  羽毛球: 5.5
 }
 
 exports.handler = async (event) => {

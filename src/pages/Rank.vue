@@ -1,16 +1,25 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Crown, Trophy } from 'lucide-vue-next'
 import { getRank, errorMessage } from '../utils/api'
 import { toast } from '../utils/ui'
 import emptyRank from '../assets/empty-rank.svg'
 
+const router = useRouter()
 const loading = ref(true)
 const data = ref({ list: [], me: null })
+const scope = ref('week')
+
+const scopes = [
+  { value: 'week', label: '本周' },
+  { value: 'total', label: '累计' }
+]
 
 const list = computed(() => data.value.list || [])
 const meInList = computed(() => list.value.some((item) => item.isMe))
 const showMyCard = computed(() => Boolean(data.value.me) && !meInList.value)
+const isWeek = computed(() => scope.value === 'week')
 
 function medalClass(index) {
   if (index === 0) return 'gold'
@@ -22,12 +31,18 @@ function medalClass(index) {
 async function load() {
   loading.value = true
   try {
-    data.value = await getRank()
+    data.value = await getRank(scope.value)
   } catch (error) {
     toast(errorMessage(error, '加载排行榜失败'))
   } finally {
     loading.value = false
   }
+}
+
+function setScope(value) {
+  if (scope.value === value) return
+  scope.value = value
+  load()
 }
 
 onMounted(load)
@@ -37,11 +52,23 @@ onMounted(load)
   <div class="page rank">
     <header class="nav-large">
       <div>
-        <p class="eyebrow">每周一 00:00 更新</p>
-        <h1>本周排行</h1>
+        <p class="eyebrow">{{ isWeek ? '每周一 00:00 更新' : '全部打卡累计' }}</p>
+        <h1>{{ isWeek ? '本周排行' : '累计排行' }}</h1>
       </div>
       <div class="nav-large__action"><Trophy :size="20" /></div>
     </header>
+
+    <div class="segmented rank-seg">
+      <button
+        v-for="item in scopes"
+        :key="item.value"
+        type="button"
+        :class="{ active: scope === item.value }"
+        @click="setScope(item.value)"
+      >
+        {{ item.label }}
+      </button>
+    </div>
 
     <template v-if="loading">
       <div class="card loading-card">
@@ -56,7 +83,7 @@ onMounted(load)
           <strong>{{ data.me.rank }}<em>名</em></strong>
         </div>
         <div class="my-rank__item">
-          <span>本周</span>
+          <span>{{ isWeek ? '本周' : '累计' }}</span>
           <strong>{{ data.me.minutes }}<em>分钟</em></strong>
         </div>
         <div class="my-rank__item">
@@ -66,7 +93,7 @@ onMounted(load)
       </section>
 
       <div class="section-title">
-        <h2>本周榜单</h2>
+        <h2>{{ isWeek ? '本周榜单' : '累计榜单' }}</h2>
         <span>TOP 20</span>
       </div>
 
@@ -92,8 +119,11 @@ onMounted(load)
 
       <div v-else class="card empty-state">
         <img class="empty-state__art" :src="emptyRank" alt="" aria-hidden="true" />
-        <h3>本周还没有人打卡</h3>
-        <p>你可以成为第一个上榜的人。</p>
+        <h3>{{ isWeek ? '本周还没有人打卡' : '还没有人留下记录' }}</h3>
+        <p>{{ isWeek ? '你可以成为第一个上榜的人。' : '完成一次运动，就能出现在榜单上。' }}</p>
+        <button type="button" class="btn-primary btn-sm empty-btn" @click="router.push('/checkin')">
+          去打卡
+        </button>
       </div>
     </template>
   </div>
@@ -102,6 +132,14 @@ onMounted(load)
 <style scoped>
 .rank {
   padding-top: 0;
+}
+
+.rank-seg {
+  margin-bottom: 14px;
+}
+
+.empty-btn {
+  margin: 16px auto 0;
 }
 
 .loading-card {

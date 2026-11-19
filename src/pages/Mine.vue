@@ -1,7 +1,18 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronRight, Download, Flame, Lock, LogOut, Trash2 } from 'lucide-vue-next'
+import {
+  Award,
+  ChevronRight,
+  Clock3,
+  Download,
+  Flame,
+  Lock,
+  LogOut,
+  Sparkles,
+  Trash2,
+  Trophy
+} from 'lucide-vue-next'
 import { getProfile, updateProfile, clearRecords, clearApiCache, errorMessage } from '../utils/api'
 import { getUser, signOut, changePassword } from '../utils/auth'
 import { todayShanghai } from '../utils/sport'
@@ -13,8 +24,14 @@ const loading = ref(true)
 const saving = ref(false)
 const profile = ref(null)
 const account = ref('')
-const form = ref({ nickname: '', weight: 60, weeklyGoal: 150 })
+const form = ref({ nickname: '', gender: 'secret', weight: 60, weeklyGoal: 150 })
 const errorText = ref('')
+
+const genders = [
+  { value: 'male', label: '男' },
+  { value: 'female', label: '女' },
+  { value: 'secret', label: '保密' }
+]
 
 const avatarText = computed(() => (profile.value?.nickname || '动').slice(0, 1))
 
@@ -24,6 +41,21 @@ const totals = computed(() => [
   { label: '总消耗', value: profile.value?.total?.calories || 0, unit: '千卡' }
 ])
 
+const achievements = computed(() => {
+  const streak = profile.value?.streak || 0
+  const count = profile.value?.total?.count || 0
+  const minutes = profile.value?.total?.minutes || 0
+  return [
+    { label: '初次打卡', desc: '完成第 1 次运动', earned: count >= 1, icon: Sparkles },
+    { label: '连续 3 天', desc: '坚持三天', earned: streak >= 3, icon: Flame },
+    { label: '连续 7 天', desc: '坚持一周', earned: streak >= 7, icon: Flame },
+    { label: '连续 30 天', desc: '坚持一个月', earned: streak >= 30, icon: Trophy },
+    { label: '打卡 10 次', desc: '累计十次运动', earned: count >= 10, icon: Award },
+    { label: '运动 1000 分钟', desc: '累计时长', earned: minutes >= 1000, icon: Clock3 }
+  ]
+})
+const earnedCount = computed(() => achievements.value.filter((item) => item.earned).length)
+
 async function load() {
   loading.value = true
   try {
@@ -31,6 +63,7 @@ async function load() {
     profile.value = data
     form.value = {
       nickname: data.nickname,
+      gender: data.gender || 'secret',
       weight: data.weight,
       weeklyGoal: data.weeklyGoal
     }
@@ -64,9 +97,15 @@ async function save() {
 
   saving.value = true
   try {
-    await updateProfile({ nickname, weight, weeklyGoal })
+    await updateProfile({
+      nickname,
+      gender: form.value.gender,
+      weight,
+      weeklyGoal
+    })
     if (profile.value) {
       profile.value.nickname = nickname
+      profile.value.gender = form.value.gender
       profile.value.weight = weight
       profile.value.weeklyGoal = weeklyGoal
     }
@@ -185,7 +224,6 @@ onMounted(load)
         <p class="eyebrow">账号与设置</p>
         <h1>我的</h1>
       </div>
-      <div class="avatar">{{ avatarText }}</div>
     </header>
 
     <template v-if="loading">
@@ -217,6 +255,24 @@ onMounted(load)
       </div>
 
       <div class="section-title">
+        <h2>成就徽章</h2>
+        <span>{{ earnedCount }} / {{ achievements.length }}</span>
+      </div>
+
+      <div class="badge-grid">
+        <div
+          v-for="badge in achievements"
+          :key="badge.label"
+          class="badge-card"
+          :class="{ earned: badge.earned }"
+        >
+          <span class="badge-icon"><component :is="badge.icon" :size="18" /></span>
+          <strong>{{ badge.label }}</strong>
+          <small>{{ badge.desc }}</small>
+        </div>
+      </div>
+
+      <div class="section-title">
         <h2>基础资料</h2>
         <span>用于计算卡路里</span>
       </div>
@@ -225,6 +281,20 @@ onMounted(load)
         <div class="form-row">
           <span class="form-row__label">昵称</span>
           <input v-model="form.nickname" type="text" maxlength="12" placeholder="1–12 位" />
+        </div>
+        <div class="form-row">
+          <span class="form-row__label">性别</span>
+          <div class="gender-pills">
+            <button
+              v-for="item in genders"
+              :key="item.value"
+              type="button"
+              :class="{ active: form.gender === item.value }"
+              @click="form.gender = item.value"
+            >
+              {{ item.label }}
+            </button>
+          </div>
         </div>
         <div class="form-row">
           <span class="form-row__label">体重</span>
@@ -437,6 +507,84 @@ onMounted(load)
   margin-top: 12px;
 }
 
+.gender-pills {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.gender-pills button {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.gender-pills button.active {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.badge-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 12px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  text-align: center;
+  opacity: 0.55;
+}
+
+.badge-card.earned {
+  border-color: var(--blue-soft-2);
+  background: var(--blue-soft);
+  opacity: 1;
+}
+
+.badge-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.badge-card.earned .badge-icon {
+  background: #fff;
+  color: var(--blue);
+}
+
+.badge-card strong {
+  font-size: 12px;
+  line-height: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.badge-card small {
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--muted);
+}
+
 .list-card {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -461,6 +609,10 @@ onMounted(load)
 
 .list-row:first-child {
   border-top: 0;
+}
+
+.list-row:active {
+  background: var(--surface-2);
 }
 
 .list-icon {

@@ -7,6 +7,7 @@ import com.dongleme.backend.service.RankService;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -20,10 +21,12 @@ public class RankController {
     }
 
     @GetMapping
-    public RankView get(@AuthenticationPrincipal AuthUser principal) {
+    public RankView get(
+            @AuthenticationPrincipal AuthUser principal,
+            @RequestParam(name = "scope", required = false) String scope) {
         if (principal == null) {
             throw ApiException.unauthorized("登录已过期，请重新登录");
         }
-        return rankService.getRank(principal.id());
+        return rankService.getRank(principal.id(), scope);
     }
 }

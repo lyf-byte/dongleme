@@ -1,31 +1,55 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Check, Clock3, Flame, Plus, RefreshCw } from 'lucide-vue-next'
-import { getProfile } from '../utils/api'
-import { SPORTS } from '../utils/sport'
+import {
+  ArrowRight,
+  BellRing,
+  Check,
+  Clock3,
+  Flame,
+  Plus,
+  RefreshCw,
+  Settings2
+} from 'lucide-vue-next'
+import { getProfile, getCustomSports } from '../utils/api'
+import { mergeSports } from '../utils/sport'
+import WeatherInline from '../components/WeatherInline.vue'
+import WeatherScene from '../components/WeatherScene.vue'
+import WeatherCanvas from '../components/WeatherCanvas.vue'
+import CustomSportManager from '../components/CustomSportManager.vue'
 
 const router = useRouter()
 const loading = ref(true)
 const profile = ref(null)
+const weatherTheme = ref({ type: 'default', isDay: true })
+const canvasFallback = ref(false)
+const customSports = ref([])
+const managerOpen = ref(false)
+const allSports = computed(() => mergeSports(customSports.value))
 
-const now = new Date()
-const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(now)
-const dateText = new Intl.DateTimeFormat('zh-CN', {
-  month: 'long',
-  day: 'numeric',
-  weekday: 'short',
-  timeZone: 'Asia/Shanghai'
-})
-  .format(now)
-  .replace('日', '日 ')
+const todayRef = ref(new Date())
+const todayStr = computed(() =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(todayRef.value)
+)
+const dateText = computed(() =>
+  new Intl.DateTimeFormat('zh-CN', {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
+    timeZone: 'Asia/Shanghai'
+  })
+    .format(todayRef.value)
+    .replace('日', '日 ')
+)
 
 const weekDays = ['一', '二', '三', '四', '五', '六', '日']
-const todayIndex = (new Date(`${todayStr}T00:00:00Z`).getUTCDay() + 6) % 7
+const todayIndex = computed(
+  () => (new Date(`${todayStr.value}T00:00:00Z`).getUTCDay() + 6) % 7
+)
 
 const weekDates = computed(() => {
-  const monday = new Date(`${todayStr}T00:00:00Z`)
-  monday.setUTCDate(monday.getUTCDate() - todayIndex)
+  const monday = new Date(`${todayStr.value}T00:00:00Z`)
+  monday.setUTCDate(monday.getUTCDate() - todayIndex.value)
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday)
     d.setUTCDate(d.getUTCDate() + i)
@@ -35,7 +59,7 @@ const weekDates = computed(() => {
 const checkedDays = computed(() => new Set(profile.value?.weekDays || []))
 
 const greet = computed(() => {
-  const hour = new Date().getHours()
+  const hour = todayRef.value.getHours()
   if (hour < 6) return '夜深了'
   if (hour < 11) return '早上好'
   if (hour < 14) return '中午好'
@@ -43,8 +67,17 @@ const greet = computed(() => {
   return '晚上好'
 })
 
+const reminderText = computed(() => {
+  const hour = todayRef.value.getHours()
+  if (hour < 11) return '今天还没动，早上适合来一组拉伸'
+  if (hour < 18) return '今天还没动，抽 10 分钟走一走'
+  return '今天还没动，睡前动一动也算打卡'
+})
+
 const avatarText = computed(() => (profile.value?.nickname || '动').slice(0, 1))
-const today = computed(() => profile.value?.today || { minutes: 0, calories: 0 })
+const today = computed(
+  () => profile.value?.today || { minutes: 0, calories: 0, types: [] }
+)
 const weekMinutes = computed(() => profile.value?.weekMinutes || 0)
 const weeklyGoal = computed(() => profile.value?.weeklyGoal || 150)
 const progress = computed(() =>
@@ -62,12 +95,19 @@ const weekTip = computed(() => {
 async function load() {
   loading.value = true
   try {
-    profile.value = await getProfile()
-  } catch {
-    profile.value = null
+    const [profileResult, sportsResult] = await Promise.allSettled([
+      getProfile(),
+      getCustomSports()
+    ])
+    profile.value = profileResult.status === 'fulfilled' ? profileResult.value : null
+    customSports.value = sportsResult.status === 'fulfilled' ? sportsResult.value : []
   } finally {
     loading.value = false
   }
+}
+
+function handleSportsChanged(list) {
+  customSports.value = list
 }
 
 function goCheckin(type) {
@@ -78,14 +118,32 @@ function goCheckin(type) {
   router.push('/checkin')
 }
 
-onMounted(load)
+function updateWeatherTheme(theme) {
+  weatherTheme.value = theme
+}
+
+function refreshDate() {
+  if (document.visibilityState === 'visible') {
+    todayRef.value = new Date()
+  }
+}
+
+onMounted(() => {
+  load()
+  document.addEventListener('visibilitychange', refreshDate)
+  window.addEventListener('focus', refreshDate)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', refreshDate)
+  window.removeEventListener('focus', refreshDate)
+})
 </script>
 
 <template>
   <div class="page home">
     <header class="nav-large">
       <div>
-        <p class="eyebrow">{{ dateText }}</p>
         <h1>{{ greet }}，{{ profile?.nickname || '运动新人' }}</h1>
       </div>
       <div class="avatar">{{ avatarText }}</div>
@@ -98,8 +156,30 @@ onMounted(load)
     </template>
 
     <template v-else-if="profile">
-      <section class="streak-card">
-        <svg class="streak-mark" viewBox="0 0 64 64" aria-hidden="true">
+      <section
+        class="streak-card"
+        :class="[
+          `streak-card--${weatherTheme.type}`,
+          weatherTheme.isDay ? 'is-day' : 'is-night'
+        ]"
+      >
+        <WeatherCanvas
+          v-if="weatherTheme.type !== 'default' && !canvasFallback"
+          :type="weatherTheme.type"
+          :is-day="weatherTheme.isDay"
+          class="streak-weather-canvas"
+          @fallback="canvasFallback = true"
+        />
+        <div v-else-if="weatherTheme.type !== 'default'" class="streak-weather-bg">
+          <WeatherScene :type="weatherTheme.type" :is-day="weatherTheme.isDay" />
+        </div>
+
+        <svg
+          v-if="weatherTheme.type === 'default'"
+          class="streak-mark"
+          viewBox="0 0 64 64"
+          aria-hidden="true"
+        >
           <path
             d="M13 40H24L32 47.5L46 28"
             fill="none"
@@ -110,6 +190,7 @@ onMounted(load)
           />
           <circle cx="48.5" cy="21.5" r="5.5" fill="rgba(246,178,27,0.9)" />
         </svg>
+        <p class="streak-date">{{ dateText }}</p>
         <div class="streak-top">
           <span class="streak-label">
             <Flame :size="16" />
@@ -126,6 +207,8 @@ onMounted(load)
             <ArrowRight :size="14" />
           </button>
         </div>
+
+        <WeatherInline @theme="updateWeatherTheme" />
 
         <div class="week-strip">
           <div
@@ -156,6 +239,20 @@ onMounted(load)
         </div>
       </div>
 
+      <div v-if="today.types && today.types.length" class="today-done">
+        <span class="today-done__label">今日完成</span>
+        <span v-for="type in today.types" :key="type" class="chip chip--blue">{{ type }}</span>
+      </div>
+
+      <button v-else type="button" class="remind-card" @click="goCheckin()">
+        <span class="remind-icon"><BellRing :size="17" /></span>
+        <span class="remind-text">
+          <strong>{{ reminderText }}</strong>
+          <small>动 10 分钟也算完成，别断了连续打卡</small>
+        </span>
+        <ArrowRight :size="16" />
+      </button>
+
       <section class="card week-card">
         <div class="week-head">
           <h2>本周进度</h2>
@@ -167,18 +264,24 @@ onMounted(load)
 
       <div class="section-title">
         <h2>选择运动</h2>
-        <span>MET 越高，消耗越大</span>
+        <button type="button" class="manage-btn" @click="managerOpen = true">
+          <Settings2 :size="13" />
+          自定义
+        </button>
       </div>
 
       <div class="sport-grid">
         <button
-          v-for="(sport, index) in SPORTS"
-          :key="sport.name"
+          v-for="(sport, index) in allSports"
+          :key="sport.custom ? `custom-${sport.id}` : sport.name"
           type="button"
           class="sport-card"
           @click="goCheckin(sport.name)"
         >
-          <span class="sport-icon" :class="'sport-icon--' + index">
+          <span
+            class="sport-icon"
+            :class="sport.custom ? 'sport-icon--custom' : 'sport-icon--' + index"
+          >
             <component :is="sport.icon" :size="20" />
           </span>
           <span class="sport-name">{{ sport.name }}</span>
@@ -190,6 +293,8 @@ onMounted(load)
         <Plus :size="18" />
         记录一次运动
       </button>
+
+      <CustomSportManager v-model="managerOpen" @changed="handleSportsChanged" />
     </template>
 
     <div v-else class="card empty-state">
@@ -220,6 +325,98 @@ onMounted(load)
   background: var(--blue);
   color: #fff;
   box-shadow: 0 14px 30px rgba(47, 107, 255, 0.25);
+  transition: box-shadow 0.3s ease;
+}
+
+.streak-card::before {
+  content: '';
+  position: absolute;
+  inset: -30%;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 75% 20%, rgba(255, 255, 255, 0.16), transparent 42%),
+    radial-gradient(circle at 20% 85%, rgba(255, 255, 255, 0.08), transparent 48%);
+  animation: cardAurora 14s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.streak-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    90deg,
+    rgba(2, 8, 23, 0.3),
+    rgba(2, 8, 23, 0.08) 54%,
+    transparent 76%
+  );
+  pointer-events: none;
+}
+
+.streak-weather-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.streak-weather-bg {
+  position: absolute;
+  top: -36px;
+  right: -24px;
+  z-index: 1;
+  width: 252px;
+  height: 252px;
+  opacity: 0.62;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(closest-side, #000 52%, transparent 96%);
+  mask-image: radial-gradient(closest-side, #000 52%, transparent 96%);
+}
+
+.streak-card.streak-card--sunny {
+  background: linear-gradient(135deg, #f6b21b, #f97316);
+  box-shadow: 0 14px 30px rgba(249, 115, 22, 0.28);
+}
+
+.streak-card.streak-card--sunny.is-night {
+  background: linear-gradient(135deg, #1e3a8a, #0f172a);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.35);
+}
+
+.streak-card.streak-card--cloudy {
+  background: linear-gradient(135deg, #5b7c99, #233446);
+  box-shadow: 0 14px 30px rgba(35, 52, 70, 0.3);
+}
+
+.streak-card.streak-card--overcast {
+  background: linear-gradient(135deg, #5c6b7a, #2f3a45);
+  box-shadow: 0 14px 30px rgba(47, 58, 69, 0.3);
+}
+
+.streak-card.streak-card--rain {
+  background: linear-gradient(135deg, #2c5364, #0f2027);
+  box-shadow: 0 14px 30px rgba(15, 32, 39, 0.35);
+}
+
+.streak-card.streak-card--thunder {
+  background: linear-gradient(135deg, #232526, #414345);
+  box-shadow: 0 14px 30px rgba(20, 20, 20, 0.35);
+}
+
+.streak-card.streak-card--snow {
+  background: linear-gradient(135deg, #4a6fa5, #274060);
+  box-shadow: 0 14px 30px rgba(39, 64, 96, 0.3);
+}
+
+.streak-card.streak-card--fog {
+  background: linear-gradient(135deg, #606c88, #3f4c6b);
+  box-shadow: 0 14px 30px rgba(63, 76, 107, 0.3);
+}
+
+.streak-card.streak-card--haze {
+  background: linear-gradient(135deg, #7a6a53, #3e3529);
+  box-shadow: 0 14px 30px rgba(62, 53, 41, 0.35);
 }
 
 .streak-mark {
@@ -233,10 +430,21 @@ onMounted(load)
 
 .streak-top {
   position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.streak-date {
+  position: relative;
+  z-index: 2;
+  margin: 0 0 6px;
+  font-size: 11px;
+  line-height: 15px;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.02em;
 }
 
 .streak-label {
@@ -257,6 +465,7 @@ onMounted(load)
 
 .streak-main {
   position: relative;
+  z-index: 2;
   display: flex;
   align-items: baseline;
   gap: 6px;
@@ -294,23 +503,11 @@ onMounted(load)
 
 .week-strip {
   position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
   margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
-}
-
-.week-strip::before {
-  content: '';
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  top: 27px;
-  height: 2px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
 }
 
 .week-strip__day {
@@ -379,6 +576,75 @@ onMounted(load)
   margin: 10px 0 0;
   font-size: 12px;
   color: var(--muted);
+}
+
+.today-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.today-done__label {
+  margin-right: 2px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.remind-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px dashed var(--blue-soft-2);
+  border-radius: 16px;
+  background: var(--blue-soft);
+  text-align: left;
+  cursor: pointer;
+}
+
+.remind-icon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: #fff;
+  color: var(--blue);
+}
+
+.remind-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.remind-text strong {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.remind-text small {
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--text-2);
+}
+
+.remind-card > svg {
+  flex: 0 0 auto;
+  color: var(--blue);
 }
 
 .today-card strong {
@@ -508,6 +774,30 @@ onMounted(load)
   color: var(--orange);
 }
 
+.sport-icon--6 {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.sport-icon--custom {
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+
+.manage-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--blue);
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
 .sport-name {
   font-size: 13px;
   font-weight: 600;
@@ -521,6 +811,28 @@ onMounted(load)
 
 .home-cta {
   margin-top: 18px;
+}
+
+@media (max-width: 480px) {
+  .streak-weather-bg {
+    inset: -4px;
+    opacity: 0.3;
+  }
+}
+
+@keyframes cardAurora {
+  from {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(2%, 1%, 0) scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .streak-card::before {
+    animation: none;
+  }
 }
 
 .empty-btn {

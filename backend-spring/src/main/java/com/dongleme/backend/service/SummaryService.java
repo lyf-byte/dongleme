@@ -81,11 +81,18 @@ public class SummaryService {
                     cached == null ? null : cached.getContent(),
                     cached != null,
                     null,
-                    null);
+                    null,
+                    hasNewRecords(userId, cached));
         }
 
         if (cached != null && !force) {
-            return new SummaryView(weekStart, cached.getContent(), true, null, null);
+            return new SummaryView(
+                    weekStart,
+                    cached.getContent(),
+                    true,
+                    null,
+                    null,
+                    hasNewRecords(userId, cached));
         }
 
         int cachedRegenCount = cached == null || cached.getRegenCount() == null
@@ -105,12 +112,12 @@ public class SummaryService {
 
         WeekStats stats = aggregate(rows);
         if (stats.count == 0) {
-            return new SummaryView(weekStart, EMPTY_CONTENT, false, null, true);
+            return new SummaryView(weekStart, EMPTY_CONTENT, false, null, true, null);
         }
 
         String fallback = buildFallback(stats);
         if (llmUrl == null || llmUrl.isBlank() || llmKey == null || llmKey.isBlank()) {
-            return new SummaryView(weekStart, fallback, false, true, null);
+            return new SummaryView(weekStart, fallback, false, true, null, null);
         }
 
         try {
@@ -124,10 +131,20 @@ public class SummaryService {
             summary.setRegenCount(regenCount);
             summaryMapper.upsert(summary);
 
-            return new SummaryView(weekStart, content, false, null, null);
+            return new SummaryView(weekStart, content, false, null, null, null);
         } catch (Exception exception) {
-            return new SummaryView(weekStart, fallback, false, true, null);
+            return new SummaryView(weekStart, fallback, false, true, null, null);
         }
+    }
+
+    private boolean hasNewRecords(String userId, WeeklySummary cached) {
+        if (cached == null || cached.getCreatedAt() == null) {
+            return false;
+        }
+        return recordMapper.selectCount(
+                Wrappers.<CheckinRecord>lambdaQuery()
+                        .eq(CheckinRecord::getUserId, userId)
+                        .gt(CheckinRecord::getCreatedAt, cached.getCreatedAt())) > 0;
     }
 
     private WeekStats aggregate(List<CheckinRecord> rows) {

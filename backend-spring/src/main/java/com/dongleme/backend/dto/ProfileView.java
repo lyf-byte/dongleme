@@ -8,6 +8,7 @@ import java.util.List;
 
 public record ProfileView(
         String nickname,
+        String gender,
         double weight,
         Integer weeklyGoal,
         int streak,
@@ -18,7 +19,7 @@ public record ProfileView(
         Totals total
 ) {
 
-    public record Today(int minutes, int calories) {
+    public record Today(int minutes, int calories, List<String> types) {
     }
 
     public record Totals(int count, int minutes, int calories) {

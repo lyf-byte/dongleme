@@ -1,8 +1,13 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { RefreshCw, Trash2 } from 'lucide-vue-next'
-import { adminRecords, adminDeleteRecord, errorMessage } from '../../utils/api'
-import { SPORTS, sportTagClass } from '../../utils/sport'
+import {
+  adminRecords,
+  adminRecordTypes,
+  adminDeleteRecord,
+  errorMessage
+} from '../../utils/api'
+import { sportTagClass } from '../../utils/sport'
 import { confirmDialog, toast } from '../../utils/ui'
 import AdminPager from './AdminPager.vue'
 
@@ -13,6 +18,7 @@ const filters = ref({ type: '', from: '', to: '' })
 const page = ref(1)
 const pageSize = 20
 const total = ref(0)
+const typeOptions = ref([])
 
 async function load() {
   loading.value = true
@@ -30,6 +36,14 @@ async function load() {
     errorText.value = errorMessage(error, '加载打卡记录失败')
   } finally {
     loading.value = false
+  }
+}
+
+async function loadTypes() {
+  try {
+    typeOptions.value = await adminRecordTypes()
+  } catch {
+    /* 类型列表加载失败时仍可按日期筛选 */
   }
 }
 
@@ -68,7 +82,10 @@ async function remove(row) {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadTypes()
+})
 </script>
 
 <template>
@@ -89,8 +106,8 @@ onMounted(load)
     <div class="admin-actions admin-filters">
       <select v-model="filters.type" class="admin-select" @change="applyFilters">
         <option value="">全部类型</option>
-        <option v-for="sport in SPORTS" :key="sport.name" :value="sport.name">
-          {{ sport.name }}
+        <option v-for="type in typeOptions" :key="type" :value="type">
+          {{ type }}
         </option>
       </select>
       <input v-model="filters.from" class="admin-input" type="date" @change="applyFilters" />

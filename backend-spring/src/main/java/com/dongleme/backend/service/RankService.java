@@ -8,7 +8,6 @@ import com.dongleme.backend.dto.RankView;
 import com.dongleme.backend.mapper.UserMapper;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,9 +22,11 @@ public class RankService {
         this.userMapper = userMapper;
     }
 
-    public RankView getRank(String userId) {
-        LocalDate weekStart = ShanghaiTime.weekStart(ShanghaiTime.today());
-        List<RankRow> rows = userMapper.selectWeeklyRank(weekStart);
+    public RankView getRank(String userId, String scopeParam) {
+        boolean total = "total".equals(scopeParam);
+        List<RankRow> rows = total
+                ? userMapper.selectTotalRank()
+                : userMapper.selectWeeklyRank(ShanghaiTime.weekStart(ShanghaiTime.today()));
 
         List<RankItem> all = new ArrayList<>(rows.size());
         int meIndex = -1;

@@ -30,6 +30,8 @@ app:
   jwt:
     secret: ${JWT_SECRET:}
     expire-days: 7
+  weather:
+    amap-key: ${AMAP_KEY:}
   llm:
     url: ${LLM_API_URL:}
     key: ${LLM_API_KEY:}

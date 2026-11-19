@@ -1,12 +1,15 @@
 package com.dongleme.backend.service;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.dongleme.backend.common.ApiException;
 import com.dongleme.backend.common.ShanghaiTime;
 import com.dongleme.backend.dto.CheckinRequest;
 import com.dongleme.backend.dto.CheckinResult;
 import com.dongleme.backend.entity.CheckinRecord;
+import com.dongleme.backend.entity.CustomSport;
 import com.dongleme.backend.entity.User;
 import com.dongleme.backend.mapper.CheckinRecordMapper;
+import com.dongleme.backend.mapper.CustomSportMapper;
 import com.dongleme.backend.mapper.UserMapper;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
@@ -16,34 +19,37 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.Map;
 
 @Service
 public class CheckinService {
 
-    private static final Map<String, Double> MET = Map.of(
-            "跑步", 8.0,
-            "快走", 4.3,
-            "骑行", 7.5,
-            "跳绳", 12.3,
-            "游泳", 6.0,
-            "力量训练", 5.5
-    );
-
     private final UserMapper userMapper;
     private final CheckinRecordMapper recordMapper;
+    private final CustomSportMapper customSportMapper;
 
-    public CheckinService(UserMapper userMapper, CheckinRecordMapper recordMapper) {
+    public CheckinService(
+            UserMapper userMapper,
+            CheckinRecordMapper recordMapper,
+            CustomSportMapper customSportMapper) {
         this.userMapper = userMapper;
         this.recordMapper = recordMapper;
+        this.customSportMapper = customSportMapper;
     }
 
     @Transactional
     public CheckinResult checkin(String userId, CheckinRequest request) {
         String type = request.type() == null ? "" : request.type();
-        Double met = MET.get(type);
+        Double met = Sports.BUILTIN_MET.get(type);
         if (met == null) {
-            throw ApiException.badRequest("运动类型不在可选范围内");
+            CustomSport customSport = customSportMapper.selectOne(
+                    Wrappers.<CustomSport>lambdaQuery()
+                            .eq(CustomSport::getUserId, userId)
+                            .eq(CustomSport::getName, type)
+                            .last("limit 1"));
+            if (customSport == null) {
+                throw ApiException.badRequest("运动类型不在可选范围内");
+            }
+            met = customSport.getMet().doubleValue();
         }
 
         Double durationValue = request.duration();
@@ -69,7 +75,9 @@ public class CheckinService {
         }
 
         LocalDate today = ShanghaiTime.today();
-        int calories = (int) Math.round(met * weight * (duration / 60.0));
+        double factor = Sports.genderFactor(user.getGender());
+        // ACSM 估算：MET × 3.5 × 体重(kg) ÷ 200 每分钟
+        int calories = (int) Math.round(met * 3.5 * weight * duration / 200.0 * factor);
 
         CheckinRecord record = new CheckinRecord();
         record.setUserId(userId);

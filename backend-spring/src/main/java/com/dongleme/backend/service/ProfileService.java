@@ -31,6 +31,7 @@ public class ProfileService {
 
     private static final Pattern NICKNAME_RE =
             Pattern.compile("^[\\u4e00-\\u9fa5A-Za-z0-9_-]{1,12}$");
+    private static final Set<String> GENDERS = Set.of("male", "female", "secret");
 
     private final AuthService authService;
     private final UserMapper userMapper;
@@ -61,6 +62,7 @@ public class ProfileService {
         int todayCalories = 0;
         int weekMinutes = 0;
         Set<LocalDate> weekDays = new LinkedHashSet<>();
+        Set<String> todayTypes = new LinkedHashSet<>();
 
         for (CheckinRecord row : rows) {
             int duration = row.getDuration() == null ? 0 : row.getDuration();
@@ -79,19 +81,23 @@ public class ProfileService {
             if (today.equals(date)) {
                 todayMinutes += duration;
                 todayCalories += calories;
+                if (row.getType() != null) {
+                    todayTypes.add(row.getType());
+                }
             }
         }
 
         ProfileBasicView basic = ProfileBasicView.of(user);
         return new ProfileView(
                 basic.nickname(),
+                basic.gender(),
                 basic.weight(),
                 basic.weeklyGoal(),
                 basic.streak(),
                 basic.createdAt(),
                 weekMinutes,
                 List.copyOf(weekDays),
-                new ProfileView.Today(todayMinutes, todayCalories),
+                new ProfileView.Today(todayMinutes, todayCalories, List.copyOf(todayTypes)),
                 new ProfileView.Totals(rows.size(), totalMinutes, totalCalories)
         );
     }
@@ -117,6 +123,15 @@ public class ProfileService {
             throw ApiException.badRequest("昵称需为 1–12 位中英文、数字、下划线或连字符");
         }
 
+        User current = authService.requireUser(userId);
+        String gender = request.gender() == null ? "" : request.gender().trim();
+        if (gender.isEmpty()) {
+            gender = current.getGender() == null ? "secret" : current.getGender();
+        }
+        if (!GENDERS.contains(gender)) {
+            throw ApiException.badRequest("性别参数不合法");
+        }
+
         Double weight = request.weight();
         if (weight == null || !Double.isFinite(weight) || weight < 20 || weight > 300) {
             throw ApiException.badRequest("体重需在 20–300 kg 之间");
@@ -131,10 +146,10 @@ public class ProfileService {
             throw ApiException.badRequest("周目标需为 1–2000 的整数");
         }
 
-        authService.requireUser(userId);
         User patch = new User();
         patch.setId(userId);
         patch.setNickname(nickname);
+        patch.setGender(gender);
         patch.setWeight(BigDecimal.valueOf(weight));
         patch.setWeeklyGoal(weeklyGoal.intValue());
         userMapper.updateById(patch);
@@ -142,6 +157,7 @@ public class ProfileService {
         Object weightValue = weight % 1 == 0 ? weight.intValue() : weight;
         return Map.of(
                 "nickname", nickname,
+                "gender", gender,
                 "weight", weightValue,
                 "weeklyGoal", weeklyGoal.intValue()
         );

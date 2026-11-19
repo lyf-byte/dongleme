@@ -28,6 +28,8 @@ public class User {
 
     private String nickname;
 
+    private String gender;
+
     private BigDecimal weight;
 
     @TableField("weekly_goal")

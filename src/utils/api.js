@@ -13,12 +13,15 @@ const adminApi = axios.create({
 
 const PROFILE_TTL = 30000
 const DATA_TTL = 30000
+const SPORTS_TTL = 30000
 
 let profileCache = null
 let profileCacheAt = 0
 let profileCacheToken = ''
+let sportsCache = null
+let sportsCacheAt = 0
 const statsCache = new Map()
-let rankCache = null
+const rankCache = new Map()
 let summaryCache = null
 let summaryCacheAt = 0
 
@@ -26,8 +29,10 @@ export function clearApiCache() {
   profileCache = null
   profileCacheAt = 0
   profileCacheToken = ''
+  sportsCache = null
+  sportsCacheAt = 0
   statsCache.clear()
-  rankCache = null
+  rankCache.clear()
   summaryCache = null
   summaryCacheAt = 0
 }
@@ -84,12 +89,43 @@ export async function getStats(range = '7d') {
   return result
 }
 
-export async function getRank() {
-  if (rankCache && Date.now() - rankCache.at < DATA_TTL) return rankCache.data
+export async function getRank(scope = 'week') {
+  const cached = rankCache.get(scope)
+  if (cached && Date.now() - cached.at < DATA_TTL) return cached.data
 
-  const result = await api.get('/rank').then((res) => res.data)
-  rankCache = { data: result, at: Date.now() }
+  const result = await api.get('/rank', { params: { scope } }).then((res) => res.data)
+  rankCache.set(scope, { data: result, at: Date.now() })
   return result
+}
+
+export async function getWeather(lat, lon) {
+  return api.get('/weather', { params: { lat, lon } }).then((res) => res.data)
+}
+
+export async function getCustomSports(force = false) {
+  if (!force && sportsCache && Date.now() - sportsCacheAt < SPORTS_TTL) return sportsCache
+
+  const result = await api.get('/sports').then((res) => res.data.sports || [])
+  sportsCache = result
+  sportsCacheAt = Date.now()
+  return result
+}
+
+export async function createCustomSport(payload) {
+  const result = await api.post('/sports', payload).then((res) => res.data.sport)
+  sportsCache = null
+  return result
+}
+
+export async function updateCustomSport(payload) {
+  const result = await api.put('/sports', payload).then((res) => res.data.sport)
+  sportsCache = null
+  return result
+}
+
+export async function deleteCustomSport(id) {
+  await api.delete('/sports', { params: { id } })
+  sportsCache = null
 }
 
 export async function generateSummary(payload = {}) {
@@ -146,6 +182,9 @@ export const adminRecords = (params = {}) =>
 
 export const adminRank = () =>
   adminApi.get('/admin', { params: { action: 'rank' } }).then((res) => res.data)
+
+export const adminRecordTypes = () =>
+  adminApi.get('/admin', { params: { action: 'types' } }).then((res) => res.data.types || [])
 
 export const adminDeleteUser = (id) =>
   adminApi.delete('/admin', { params: { action: 'user', id } }).then((res) => res.data)

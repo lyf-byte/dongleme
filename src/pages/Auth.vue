@@ -14,6 +14,13 @@ const agreed = ref(false)
 const loading = ref(false)
 const errorText = ref('')
 const showPassword = ref(false)
+const docOpen = ref(false)
+const docType = ref('terms')
+
+function openDoc(type) {
+  docType.value = type
+  docOpen.value = true
+}
 
 const PHONE_RE = /^1[3-9]\d{9}$/
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -158,6 +165,7 @@ async function onSubmit() {
             <button
               type="button"
               class="auth-eye"
+              :aria-label="showPassword ? '隐藏密码' : '显示密码'"
               @click="showPassword = !showPassword"
             >
               <EyeOff v-if="showPassword" :size="18" />
@@ -180,7 +188,16 @@ async function onSubmit() {
 
         <label v-if="mode === 'register'" class="check">
           <input v-model="agreed" type="checkbox" />
-          <span>我已阅读并同意《用户协议》与《隐私说明》</span>
+          <span>
+            我已阅读并同意
+            <button type="button" class="doc-link" @click.prevent.stop="openDoc('terms')">
+              《用户协议》
+            </button>
+            与
+            <button type="button" class="doc-link" @click.prevent.stop="openDoc('privacy')">
+              《隐私说明》
+            </button>
+          </span>
         </label>
 
         <p v-if="errorText" class="form-error">{{ errorText }}</p>
@@ -200,6 +217,29 @@ async function onSubmit() {
     </main>
 
     <p class="auth-foot">校园运动打卡 · 让坚持有迹可循</p>
+
+    <transition name="ui">
+      <div v-if="docOpen" class="doc-overlay" @click.self="docOpen = false">
+        <div class="doc-sheet" role="dialog" aria-modal="true">
+          <h2>{{ docType === 'terms' ? '用户协议' : '隐私说明' }}</h2>
+          <div v-if="docType === 'terms'" class="doc-body">
+            <p>1. 本应用提供运动打卡、统计、排行与 AI 小结功能，内容仅供参考，不构成医疗建议。</p>
+            <p>2. 请如实记录运动数据，禁止刷量、作弊等影响排行榜公平的行为。</p>
+            <p>3. 账号与密码由你自行保管，请勿转借他人使用。</p>
+            <p>4. 我们可能根据功能需要更新本协议，更新后会在应用内提示。</p>
+          </div>
+          <div v-else class="doc-body">
+            <p>1. 我们仅收集手机号或邮箱用于登录，昵称、体重和周目标用于计算卡路里与目标进度。</p>
+            <p>2. 打卡记录用于统计、排行榜和周小结；AI 小结仅向模型发送聚合后的运动数据。</p>
+            <p>3. 定位信息仅在你授权后用于获取当地天气，不会保存位置轨迹。</p>
+            <p>4. 你可以在「我的」中导出或清空自己的数据。</p>
+          </div>
+          <button type="button" class="btn-primary doc-close" @click="docOpen = false">
+            我知道了
+          </button>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -327,5 +367,58 @@ async function onSubmit() {
   text-align: center;
   font-size: 11px;
   color: var(--muted);
+}
+
+.doc-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.doc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(17, 24, 39, 0.4);
+  backdrop-filter: blur(3px);
+}
+
+.doc-sheet {
+  width: 100%;
+  max-width: 360px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 20px;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: 0 24px 60px rgba(17, 24, 39, 0.25);
+}
+
+.doc-sheet h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 700;
+}
+
+.doc-body p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 21px;
+  color: var(--text-2);
+}
+
+.doc-close {
+  height: 44px;
+  margin-top: 6px;
+  font-size: 14px;
 }
 </style>

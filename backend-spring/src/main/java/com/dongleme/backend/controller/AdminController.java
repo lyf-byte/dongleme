@@ -43,6 +43,7 @@ public class AdminController {
             case "users" -> adminService.users(query, page, pageSize);
             case "records" -> adminService.records(type, from, to, page, pageSize);
             case "rank" -> adminService.rank();
+            case "types" -> Map.of("types", adminService.types());
             default -> throw new ApiException(HttpStatus.NOT_FOUND, "未知的后台操作");
         };
     }

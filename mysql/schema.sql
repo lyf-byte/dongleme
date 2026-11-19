@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   username VARCHAR(32) NULL,
   password_hash VARCHAR(255) NOT NULL,
   nickname VARCHAR(12) NOT NULL DEFAULT '运动新人',
+  gender VARCHAR(10) NOT NULL DEFAULT 'secret',
   weight DECIMAL(5, 2) NOT NULL DEFAULT 60,
   weekly_goal INT NOT NULL DEFAULT 150,
   is_admin TINYINT(1) NOT NULL DEFAULT 0,
@@ -54,4 +55,15 @@ CREATE TABLE IF NOT EXISTS summaries (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_summaries_user_week (user_id, week_start),
   CONSTRAINT fk_summaries_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS custom_sports (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  name VARCHAR(20) NOT NULL,
+  met DECIMAL(4, 1) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_custom_sports_user_name (user_id, name),
+  CONSTRAINT fk_custom_sports_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT chk_custom_sports_met CHECK (met BETWEEN 1 AND 20)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;

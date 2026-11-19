@@ -1,27 +1,41 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Check, Minus, Plus } from 'lucide-vue-next'
-import { getProfile, submitCheckin, errorMessage } from '../utils/api'
-import { SPORTS, calcCalories } from '../utils/sport'
+import { ArrowLeft, Check, Minus, Plus, Settings2 } from 'lucide-vue-next'
+import { getProfile, getCustomSports, submitCheckin, errorMessage } from '../utils/api'
+import { SPORTS, calcCalories, mergeSports } from '../utils/sport'
 import { toast, confirmDialog } from '../utils/ui'
+import CustomSportManager from '../components/CustomSportManager.vue'
 
 const route = useRoute()
 const router = useRouter()
 
-const initialType = SPORTS.some((item) => item.name === route.query.type)
-  ? String(route.query.type)
-  : '跑步'
+const customSports = ref([])
+const managerOpen = ref(false)
+const allSports = computed(() => mergeSports(customSports.value))
 
-const form = ref({ type: initialType, duration: 30, weight: 60 })
+const routeType = typeof route.query.type === 'string' ? route.query.type : ''
+const initialSport = allSports.value.find((sport) => sport.name === routeType)
+
+const form = ref({
+  type: initialSport ? initialSport.name : '跑步',
+  duration: 30,
+  weight: 60
+})
+const gender = ref('secret')
 const submitting = ref(false)
 
 const currentSport = computed(
-  () => SPORTS.find((sport) => sport.name === form.value.type) || SPORTS[0]
+  () => allSports.value.find((sport) => sport.name === form.value.type) || allSports.value[0]
 )
 const met = computed(() => currentSport.value.met)
 const calories = computed(() =>
-  calcCalories(met.value, Number(form.value.weight) || 60, Number(form.value.duration) || 0)
+  calcCalories(
+    met.value,
+    Number(form.value.weight) || 60,
+    Number(form.value.duration) || 0,
+    gender.value
+  )
 )
 
 function adjust(delta) {
@@ -33,8 +47,29 @@ async function loadProfile() {
   try {
     const profile = await getProfile()
     if (profile?.weight) form.value.weight = profile.weight
+    gender.value = profile?.gender || 'secret'
   } catch {
     /* 保留默认体重 */
+  }
+}
+
+async function loadCustomSports() {
+  try {
+    const list = await getCustomSports()
+    customSports.value = list
+    if (!SPORTS.some((sport) => sport.name === form.value.type)) {
+      const matched = list.find((sport) => sport.name === routeType)
+      if (matched) form.value.type = matched.name
+    }
+  } catch {
+    /* 自定义运动加载失败时仍可使用内置运动 */
+  }
+}
+
+function handleSportsChanged(list) {
+  customSports.value = list
+  if (!allSports.value.some((sport) => sport.name === form.value.type)) {
+    form.value.type = '跑步'
   }
 }
 
@@ -82,13 +117,16 @@ async function submit(overwrite = false) {
   }
 }
 
-onMounted(loadProfile)
+onMounted(() => {
+  loadProfile()
+  loadCustomSports()
+})
 </script>
 
 <template>
   <div class="page page--plain checkin">
     <header class="topbar">
-      <button type="button" class="topbar__btn" @click="router.back()">
+      <button type="button" class="topbar__btn" aria-label="返回" @click="router.back()">
         <ArrowLeft :size="20" />
       </button>
       <h1>记录运动</h1>
@@ -108,18 +146,25 @@ onMounted(loadProfile)
 
     <div class="section-title">
       <h2>运动类型</h2>
-      <span>选择一项</span>
+      <button type="button" class="manage-btn" @click="managerOpen = true">
+        <Settings2 :size="13" />
+        自定义
+      </button>
     </div>
 
     <div class="type-grid">
       <button
-        v-for="(sport, index) in SPORTS"
-        :key="sport.name"
+        v-for="(sport, index) in allSports"
+        :key="sport.custom ? `custom-${sport.id}` : sport.name"
         type="button"
         :class="{ active: form.type === sport.name }"
+        :aria-pressed="form.type === sport.name"
         @click="form.type = sport.name"
       >
-        <span class="type-icon" :class="'type-icon--' + index">
+        <span
+          class="type-icon"
+          :class="sport.custom ? 'type-icon--custom' : 'type-icon--' + index"
+        >
           <component :is="sport.icon" :size="16" />
         </span>
         <span class="type-name">{{ sport.name }}</span>
@@ -154,12 +199,17 @@ onMounted(loadProfile)
       </div>
     </div>
 
-    <p class="tip">同一天同一类型只保留一条记录，重复提交时会询问是否覆盖。</p>
+    <p class="tip">
+      同一天同一类型只保留一条记录，重复提交时会询问是否覆盖。热量按 ACSM 公式估算：
+      MET × 3.5 × 体重 ÷ 200 × 时长，女性按 0.9 系数，男性/保密按 1.0。
+    </p>
 
     <button type="button" class="btn-primary checkin-submit" :disabled="submitting" @click="submit()">
       <span>{{ submitting ? '保存中…' : '完成打卡' }}</span>
       <Check :size="18" />
     </button>
+
+    <CustomSportManager v-model="managerOpen" @changed="handleSportsChanged" />
   </div>
 </template>
 
@@ -259,6 +309,10 @@ onMounted(loadProfile)
   box-shadow: inset 0 0 0 1px var(--blue);
 }
 
+.type-grid button:active {
+  transform: scale(0.98);
+}
+
 .type-icon {
   width: 30px;
   height: 30px;
@@ -297,6 +351,30 @@ onMounted(loadProfile)
 .type-icon--5 {
   background: var(--orange-soft);
   color: var(--orange);
+}
+
+.type-icon--6 {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.type-icon--custom {
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+
+.manage-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--blue);
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
 }
 
 .type-name {

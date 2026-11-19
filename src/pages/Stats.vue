@@ -87,7 +87,7 @@ function renderCharts() {
         axisLine: { lineStyle: { color: '#e1e5eb' } },
         axisTick: { show: false },
         axisLabel: {
-          color: '#9ca3af',
+          color: '#6b7280',
           fontSize: 10,
           interval: range.value === '7d' ? 0 : 4
         }
@@ -95,7 +95,7 @@ function renderCharts() {
       yAxis: {
         type: 'value',
         splitLine: { lineStyle: { color: '#f1f3f6', type: 'dashed' } },
-        axisLabel: { color: '#9ca3af', fontSize: 10 }
+        axisLabel: { color: '#6b7280', fontSize: 10 }
       },
       series: [
         {

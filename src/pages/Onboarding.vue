@@ -10,10 +10,15 @@ import onboardingArt from '../assets/onboarding.svg'
 const route = useRoute()
 const router = useRouter()
 
-const form = ref({ nickname: '', weight: 60, weeklyGoal: 150 })
+const form = ref({ nickname: '', gender: 'secret', weight: 60, weeklyGoal: 150 })
 const loading = ref(false)
 const errorText = ref('')
 
+const genders = [
+  { value: 'male', label: '男' },
+  { value: 'female', label: '女' },
+  { value: 'secret', label: '保密' }
+]
 const presets = [100, 150, 200, 300]
 const avatarText = computed(() => form.value.nickname.trim().slice(0, 1) || '动')
 
@@ -37,7 +42,12 @@ async function submit() {
 
   loading.value = true
   try {
-    await updateProfile({ nickname, weight, weeklyGoal })
+    await updateProfile({
+      nickname,
+      gender: form.value.gender,
+      weight,
+      weeklyGoal
+    })
     await completeOnboarding()
     toast('设置完成')
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
@@ -54,7 +64,7 @@ async function submit() {
   <div class="page page--plain onboarding">
     <header class="nav-large">
       <div>
-        <p class="eyebrow">第 1 步 / 共 1 步</p>
+        <p class="eyebrow">欢迎加入</p>
         <h1>先认识一下你</h1>
       </div>
     </header>
@@ -80,6 +90,20 @@ async function submit() {
           maxlength="12"
           placeholder="1–12 位中英文或数字"
         />
+      </div>
+      <div class="form-row">
+        <span class="form-row__label">性别</span>
+        <div class="gender-pills">
+          <button
+            v-for="item in genders"
+            :key="item.value"
+            type="button"
+            :class="{ active: form.gender === item.value }"
+            @click="form.gender = item.value"
+          >
+            {{ item.label }}
+          </button>
+        </div>
       </div>
       <div class="form-row">
         <span class="form-row__label">体重</span>
@@ -191,6 +215,31 @@ async function submit() {
 }
 
 .goal-pills button.active {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.gender-pills {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.gender-pills button {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.gender-pills button.active {
   border-color: var(--blue);
   background: var(--blue-soft);
   color: var(--blue);

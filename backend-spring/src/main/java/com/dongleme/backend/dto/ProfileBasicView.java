@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 
 public record ProfileBasicView(
         String nickname,
+        String gender,
         double weight,
         Integer weeklyGoal,
         int streak,
@@ -17,6 +18,7 @@ public record ProfileBasicView(
     public static ProfileBasicView of(User user) {
         return new ProfileBasicView(
                 user.getNickname(),
+                user.getGender() == null ? "secret" : user.getGender(),
                 user.getWeight() == null ? 60 : user.getWeight().doubleValue(),
                 user.getWeeklyGoal(),
                 ShanghaiTime.effectiveStreak(user.getStreak(), user.getLastCheckDate()),

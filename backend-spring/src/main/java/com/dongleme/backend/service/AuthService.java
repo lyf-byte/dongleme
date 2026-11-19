@@ -85,6 +85,7 @@ public class AuthService {
         user.setPhone("phone".equals(lookup.type()) ? lookup.value() : null);
         user.setPasswordHash(passwordEncoder.encode(password));
         user.setNickname("运动新人");
+        user.setGender("secret");
         user.setWeight(new BigDecimal("60"));
         user.setWeeklyGoal(150);
 

@@ -22,6 +22,15 @@ public interface UserMapper extends BaseMapper<User> {
     List<RankRow> selectWeeklyRank(@Param("weekStart") LocalDate weekStart);
 
     @Select("""
+            select u.id, u.nickname, coalesce(sum(r.duration), 0) as weekly_minutes
+            from users u
+            join records r on r.user_id = u.id
+            group by u.id, u.nickname
+            order by weekly_minutes desc, u.nickname asc
+            """)
+    List<RankRow> selectTotalRank();
+
+    @Select("""
             <script>
             select u.id, u.nickname, u.weight, u.weekly_goal, u.streak,
                    u.is_admin as admin, u.created_at, u.email, u.phone, u.username,
