@@ -190,7 +190,7 @@ async function onSubmit() {
           anon key 后重启。
         </div>
 
-        <button class="btn-primary auth-submit" type="submit" :disabled="loading || !isConfigured">
+        <button class="btn-primary auth-submit" type="submit" :disabled="loading">
           <span>{{ submitText }}</span>
           <ArrowRight :size="18" />
         </button>
