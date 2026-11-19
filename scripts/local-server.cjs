@@ -63,8 +63,10 @@ const mime = {
 
 function serveIndex(res) {
   let html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8')
-  // 本地调试时跳过 Service Worker，避免缓存干扰
-  html = html.replace(/<script id="vite-plugin-pwa:register-sw"[^>]*><\/script>/, '')
+  // 本地调试时跳过 Service Worker，避免缓存干扰；生产环境保留 PWA 注册
+  if (process.env.NODE_ENV !== 'production') {
+    html = html.replace(/<script id="vite-plugin-pwa:register-sw"[^>]*><\/script>/, '')
+  }
   res.writeHead(200, {
     'Content-Type': 'text/html; charset=utf-8',
     'Cache-Control': 'no-store'
