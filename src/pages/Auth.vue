@@ -185,11 +185,6 @@ async function onSubmit() {
 
         <p v-if="errorText" class="form-error">{{ errorText }}</p>
 
-        <div v-if="!isConfigured" class="notice">
-          未配置 Supabase：把 <code>.env.example</code> 复制为 <code>.env</code>，填入项目地址与
-          anon key 后重启。
-        </div>
-
         <button class="btn-primary auth-submit" type="submit" :disabled="loading">
           <span>{{ submitText }}</span>
           <ArrowRight :size="18" />

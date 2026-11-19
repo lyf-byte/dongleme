@@ -147,7 +147,6 @@ mysql -u root -p < /opt/donglemei/mysql/schema.sql
 - systemd：`/etc/systemd/system/donglemei.service`
 - Caddy：`/etc/caddy/Caddyfile`
 - 环境变量：`/opt/donglemei/.env`（权限 600）
-- 旧 Supabase 环境变量备份：`/opt/donglemei/.env.supabase`
 
 ## 数据备份
 
