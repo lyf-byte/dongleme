@@ -4,13 +4,22 @@
 
 ## 线上地址
 
+### Netlify（GitHub 自动部署）
+
 - 用户端：<https://donglemei-lyf.netlify.app>
 - 后台入口：<https://donglemei-lyf.netlify.app/admin/login>
 - Supabase 代理：<https://donglemei-lyf.netlify.app/.netlify/functions/supabase-proxy>
+- 推送到 GitHub `main` 分支会自动触发 Netlify 构建部署。
 
-推送到 GitHub `main` 分支会自动触发 Netlify 构建部署。
+### AWS EC2（悉尼）
 
-本地开发同样可访问 `http://127.0.0.1:8888`，前后端都已切到上面的代理地址。
+- 用户端：<https://3.105.101.123.nip.io>
+- 后台入口：<https://3.105.101.123.nip.io/admin/login>
+- Supabase 代理：<https://3.105.101.123.nip.io/.netlify/functions/supabase-proxy>
+- 实例：Ubuntu 24.04 / t3.small / 弹性 IP `3.105.101.123`
+- SSH：`ssh -i D:\Edge\donglemei_new ubuntu@3.105.101.123`
+
+本地开发同样可访问 `http://127.0.0.1:8888`，前后端都已切到 Netlify 代理地址。
 
 ## 技术栈
 
@@ -148,6 +157,41 @@ netlify env:set LLM_API_KEY sk-xxx
 ```
 
 4. 重新部署。`netlify.toml` 已包含 SPA fallback、Functions 目录与 CSP 安全头。
+
+## 部署到 AWS EC2
+
+当前 AWS 实例运行方式：
+
+- 系统：Ubuntu 24.04，t3.small
+- 代码目录：`/opt/donglemei`
+- 运行时：Node 22（supabase-js 需要原生 WebSocket）
+- 进程管理：systemd 服务 `donglemei`
+- HTTPS：Caddy 反向代理 + Let's Encrypt 自动证书
+- 临时域名：`3.105.101.123.nip.io`（解析到弹性 IP）
+
+日常更新：
+
+```bash
+ssh -i D:\Edge\donglemei_new ubuntu@3.105.101.123
+cd /opt/donglemei
+git pull
+npm ci
+npm run build
+sudo systemctl restart donglemei
+```
+
+关键文件：
+
+- systemd：`/etc/systemd/system/donglemei.service`
+- Caddy：`/etc/caddy/Caddyfile`
+- 环境变量：`/opt/donglemei/.env`（权限 600）
+
+说明：
+
+- 前端 `VITE_SUPABASE_URL` 指向 AWS 自己的 `/.netlify/functions/supabase-proxy`；后端 `SUPABASE_URL` 直连 Supabase。
+- 安全组需要同时保留 `MyWebServerGroup`（22/80/443）；确认 SSH 正常后可以移除 `launch-wizard-1`。
+- 旧 `donglemei.pem` 已失效，当前 SSH 密钥是 `D:\Edge\donglemei_new`，请备份好。
+- 正式使用时建议把自有域名解析到弹性 IP，并修改 `/etc/caddy/Caddyfile` 后执行 `sudo systemctl reload caddy`。
 
 ## 手机号登录说明
 
