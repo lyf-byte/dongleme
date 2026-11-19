@@ -1,6 +1,7 @@
 package com.dongleme.backend.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.dongleme.backend.dto.AdminUserRow;
 import com.dongleme.backend.dto.RankRow;
 import com.dongleme.backend.entity.User;
 import org.apache.ibatis.annotations.Param;
@@ -19,4 +20,17 @@ public interface UserMapper extends BaseMapper<User> {
             order by weekly_minutes desc, u.nickname asc
             """)
     List<RankRow> selectWeeklyRank(@Param("weekStart") LocalDate weekStart);
+
+    @Select("""
+            select u.id, u.nickname, u.weight, u.weekly_goal, u.streak,
+                   u.is_admin as admin, u.created_at, u.email, u.phone, u.username,
+                   count(r.id) as record_count
+            from users u
+            left join records r on r.user_id = u.id
+            group by u.id, u.nickname, u.weight, u.weekly_goal, u.streak,
+                     u.is_admin, u.created_at, u.email, u.phone, u.username
+            order by u.created_at desc
+            limit 500
+            """)
+    List<AdminUserRow> selectAdminUsers();
 }

@@ -39,7 +39,7 @@ async function logout() {
 
 onMounted(() => {
   const user = getAdminUser()
-  account.value = user?.email || user?.phone || ''
+  account.value = user?.username || user?.email || user?.phone || ''
 })
 </script>
 
