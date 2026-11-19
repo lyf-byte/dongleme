@@ -25,7 +25,6 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -57,20 +56,27 @@ public class AdminService {
                 totalUsers, totalRecords, activeToday, weekMinutes, recent);
     }
 
-    public AdminUsersView users(String queryParam) {
-        String query = queryParam == null ? "" : queryParam.trim().toLowerCase(Locale.ROOT);
+    public AdminUsersView users(String queryParam, int page, int pageSize) {
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(pageSize, 1), 50);
+        String query = queryParam == null ? "" : queryParam.trim();
 
-        List<AdminUserView> users = userMapper.selectAdminUsers().stream()
+        long total = userMapper.countAdminUsers(query);
+        int offset = (safePage - 1) * safeSize;
+        List<AdminUserView> users = userMapper
+                .selectAdminUsersPage(query, safeSize, offset)
+                .stream()
                 .map(this::toUserView)
-                .filter(user -> query.isEmpty()
-                        || user.nickname().toLowerCase(Locale.ROOT).contains(query)
-                        || user.account().toLowerCase(Locale.ROOT).contains(query))
                 .toList();
 
-        return new AdminUsersView(users);
+        return new AdminUsersView(users, total, safePage, safeSize);
     }
 
-    public AdminRecordsView records(String type, LocalDate from, LocalDate to) {
+    public AdminRecordsView records(
+            String type, LocalDate from, LocalDate to, int page, int pageSize) {
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(pageSize, 1), 100);
+
         LambdaQueryWrapper<CheckinRecord> wrapper = Wrappers.lambdaQuery();
         if (type != null && !type.isBlank()) {
             wrapper.eq(CheckinRecord::getType, type);
@@ -81,9 +87,12 @@ public class AdminService {
         if (to != null) {
             wrapper.le(CheckinRecord::getDate, to);
         }
+
+        long total = recordMapper.selectCount(wrapper);
+        int offset = (safePage - 1) * safeSize;
         wrapper.orderByDesc(CheckinRecord::getDate)
                 .orderByDesc(CheckinRecord::getCreatedAt)
-                .last("limit 200");
+                .last("limit " + safeSize + " offset " + offset);
 
         List<CheckinRecord> rows = recordMapper.selectList(wrapper);
         Map<String, String> nicknames = loadNicknames(rows);
@@ -99,7 +108,7 @@ public class AdminService {
                         nicknames.getOrDefault(row.getUserId(), "运动新人")))
                 .toList();
 
-        return new AdminRecordsView(records);
+        return new AdminRecordsView(records, total, safePage, safeSize);
     }
 
     public AdminRankView rank() {

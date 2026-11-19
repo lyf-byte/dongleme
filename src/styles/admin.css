@@ -388,6 +388,32 @@
   font-size: 13px;
 }
 
+.admin-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-pager__info {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.admin-pager__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-pager .admin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* ---------- admin login ---------- */
 
 .admin-login {

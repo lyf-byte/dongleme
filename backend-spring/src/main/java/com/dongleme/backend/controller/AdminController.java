@@ -30,6 +30,8 @@ public class AdminController {
             @RequestParam(name = "action", required = false) String action,
             @RequestParam(name = "query", required = false) String query,
             @RequestParam(name = "type", required = false) String type,
+            @RequestParam(name = "page", defaultValue = "1") int page,
+            @RequestParam(name = "pageSize", defaultValue = "20") int pageSize,
             @RequestParam(name = "from", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(name = "to", required = false)
@@ -38,8 +40,8 @@ public class AdminController {
         String normalized = action == null || action.isBlank() ? "overview" : action;
         return switch (normalized) {
             case "overview" -> adminService.overview();
-            case "users" -> adminService.users(query);
-            case "records" -> adminService.records(type, from, to);
+            case "users" -> adminService.users(query, page, pageSize);
+            case "records" -> adminService.records(type, from, to, page, pageSize);
             case "rank" -> adminService.rank();
             default -> throw new ApiException(HttpStatus.NOT_FOUND, "未知的后台操作");
         };

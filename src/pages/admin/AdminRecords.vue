@@ -4,23 +4,43 @@ import { RefreshCw, Trash2 } from 'lucide-vue-next'
 import { adminRecords, adminDeleteRecord, errorMessage } from '../../utils/api'
 import { SPORTS, sportTagClass } from '../../utils/sport'
 import { confirmDialog, toast } from '../../utils/ui'
+import AdminPager from './AdminPager.vue'
 
 const records = ref([])
 const loading = ref(true)
 const errorText = ref('')
 const filters = ref({ type: '', from: '', to: '' })
+const page = ref(1)
+const pageSize = 20
+const total = ref(0)
 
 async function load() {
   loading.value = true
   errorText.value = ''
   try {
-    const data = await adminRecords(filters.value)
+    const data = await adminRecords({
+      ...filters.value,
+      page: page.value,
+      pageSize
+    })
     records.value = data.records || []
+    total.value = data.total || 0
+    page.value = data.page || page.value
   } catch (error) {
     errorText.value = errorMessage(error, '加载打卡记录失败')
   } finally {
     loading.value = false
   }
+}
+
+function applyFilters() {
+  page.value = 1
+  load()
+}
+
+function changePage(next) {
+  page.value = next
+  load()
 }
 
 async function remove(row) {
@@ -39,6 +59,9 @@ async function remove(row) {
   try {
     await adminDeleteRecord(row.id)
     toast('已删除')
+    if (records.value.length === 1 && page.value > 1) {
+      page.value -= 1
+    }
     await load()
   } catch (error) {
     toast(errorMessage(error, '删除失败'))
@@ -53,7 +76,7 @@ onMounted(load)
     <div class="admin-page-head">
       <div>
         <h1>打卡记录</h1>
-        <p>最多展示最近 200 条，可按类型和日期筛选</p>
+        <p>共 {{ total }} 条，可按类型和日期筛选</p>
       </div>
       <div class="admin-actions">
         <button type="button" class="admin-btn" :disabled="loading" @click="load">
@@ -64,15 +87,15 @@ onMounted(load)
     </div>
 
     <div class="admin-actions admin-filters">
-      <select v-model="filters.type" class="admin-select" @change="load">
+      <select v-model="filters.type" class="admin-select" @change="applyFilters">
         <option value="">全部类型</option>
         <option v-for="sport in SPORTS" :key="sport.name" :value="sport.name">
           {{ sport.name }}
         </option>
       </select>
-      <input v-model="filters.from" class="admin-input" type="date" @change="load" />
+      <input v-model="filters.from" class="admin-input" type="date" @change="applyFilters" />
       <span style="color: var(--muted); font-size: 12px">至</span>
-      <input v-model="filters.to" class="admin-input" type="date" @change="load" />
+      <input v-model="filters.to" class="admin-input" type="date" @change="applyFilters" />
     </div>
 
     <p v-if="errorText" class="admin-error">{{ errorText }}</p>
@@ -80,7 +103,7 @@ onMounted(load)
     <section class="admin-card" style="margin-top: 14px">
       <div class="admin-card__head">
         <h2>记录列表</h2>
-        <span class="admin-tag">{{ records.length }} 条</span>
+        <span class="admin-tag">{{ total }} 条</span>
       </div>
 
       <div v-if="loading" class="admin-loading">加载中…</div>
@@ -114,6 +137,14 @@ onMounted(load)
           </tbody>
         </table>
       </div>
+
+      <AdminPager
+        v-if="!loading && total > 0"
+        :page="page"
+        :page-size="pageSize"
+        :total="total"
+        @change="changePage"
+      />
     </section>
   </div>
 </template>

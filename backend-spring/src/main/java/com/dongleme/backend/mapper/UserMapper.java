@@ -22,15 +22,43 @@ public interface UserMapper extends BaseMapper<User> {
     List<RankRow> selectWeeklyRank(@Param("weekStart") LocalDate weekStart);
 
     @Select("""
+            <script>
             select u.id, u.nickname, u.weight, u.weekly_goal, u.streak,
                    u.is_admin as admin, u.created_at, u.email, u.phone, u.username,
                    count(r.id) as record_count
             from users u
             left join records r on r.user_id = u.id
+            <where>
+              <if test="query != null and query != ''">
+                (u.nickname like concat('%', #{query}, '%')
+                 or u.email like concat('%', #{query}, '%')
+                 or u.phone like concat('%', #{query}, '%')
+                 or u.username like concat('%', #{query}, '%'))
+              </if>
+            </where>
             group by u.id, u.nickname, u.weight, u.weekly_goal, u.streak,
                      u.is_admin, u.created_at, u.email, u.phone, u.username
             order by u.created_at desc
-            limit 500
+            limit #{limit} offset #{offset}
+            </script>
             """)
-    List<AdminUserRow> selectAdminUsers();
+    List<AdminUserRow> selectAdminUsersPage(
+            @Param("query") String query,
+            @Param("limit") int limit,
+            @Param("offset") int offset);
+
+    @Select("""
+            <script>
+            select count(*) from users u
+            <where>
+              <if test="query != null and query != ''">
+                (u.nickname like concat('%', #{query}, '%')
+                 or u.email like concat('%', #{query}, '%')
+                 or u.phone like concat('%', #{query}, '%')
+                 or u.username like concat('%', #{query}, '%'))
+              </if>
+            </where>
+            </script>
+            """)
+    long countAdminUsers(@Param("query") String query);
 }

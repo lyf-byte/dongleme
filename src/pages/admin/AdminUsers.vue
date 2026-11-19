@@ -4,24 +4,44 @@ import { RefreshCw, Search, Trash2 } from 'lucide-vue-next'
 import { adminUsers, adminDeleteUser, errorMessage } from '../../utils/api'
 import { getAdminUser } from '../../utils/auth'
 import { confirmDialog, toast } from '../../utils/ui'
+import AdminPager from './AdminPager.vue'
 
 const users = ref([])
 const loading = ref(true)
 const errorText = ref('')
 const query = ref('')
 const currentUserId = ref('')
+const page = ref(1)
+const pageSize = 10
+const total = ref(0)
 
 async function load() {
   loading.value = true
   errorText.value = ''
   try {
-    const data = await adminUsers(query.value)
+    const data = await adminUsers({
+      query: query.value,
+      page: page.value,
+      pageSize
+    })
     users.value = data.users || []
+    total.value = data.total || 0
+    page.value = data.page || page.value
   } catch (error) {
     errorText.value = errorMessage(error, '加载用户失败')
   } finally {
     loading.value = false
   }
+}
+
+function search() {
+  page.value = 1
+  load()
+}
+
+function changePage(next) {
+  page.value = next
+  load()
 }
 
 async function remove(user) {
@@ -45,6 +65,9 @@ async function remove(user) {
   try {
     await adminDeleteUser(user.id)
     toast('已删除')
+    if (users.value.length === 1 && page.value > 1) {
+      page.value -= 1
+    }
     await load()
   } catch (error) {
     toast(errorMessage(error, '删除失败'))
@@ -66,7 +89,7 @@ onMounted(async () => {
     <div class="admin-page-head">
       <div>
         <h1>用户管理</h1>
-        <p>共 {{ users.length }} 个用户</p>
+        <p>共 {{ total }} 个用户</p>
       </div>
       <div class="admin-actions">
         <input
@@ -74,9 +97,9 @@ onMounted(async () => {
           class="admin-input"
           type="search"
           placeholder="搜索昵称或账号"
-          @keyup.enter="load"
+          @keyup.enter="search"
         />
-        <button type="button" class="admin-btn admin-btn--primary" @click="load">
+        <button type="button" class="admin-btn admin-btn--primary" @click="search">
           <Search :size="15" />
           搜索
         </button>
@@ -92,7 +115,7 @@ onMounted(async () => {
     <section class="admin-card">
       <div class="admin-card__head">
         <h2>用户列表</h2>
-        <span class="admin-tag">{{ users.length }} 人</span>
+        <span class="admin-tag">{{ total }} 人</span>
       </div>
 
       <div v-if="loading" class="admin-loading">加载中…</div>
@@ -145,6 +168,14 @@ onMounted(async () => {
           </tbody>
         </table>
       </div>
+
+      <AdminPager
+        v-if="!loading && total > 0"
+        :page="page"
+        :page-size="pageSize"
+        :total="total"
+        @change="changePage"
+      />
     </section>
   </div>
 </template>

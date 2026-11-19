@@ -138,8 +138,8 @@ export async function clearRecords() {
 export const adminOverview = () =>
   adminApi.get('/admin', { params: { action: 'overview' } }).then((res) => res.data)
 
-export const adminUsers = (query = '') =>
-  adminApi.get('/admin', { params: { action: 'users', query } }).then((res) => res.data)
+export const adminUsers = (params = {}) =>
+  adminApi.get('/admin', { params: { action: 'users', ...params } }).then((res) => res.data)
 
 export const adminRecords = (params = {}) =>
   adminApi.get('/admin', { params: { action: 'records', ...params } }).then((res) => res.data)
