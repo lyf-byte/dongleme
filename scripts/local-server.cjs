@@ -21,7 +21,7 @@ const PORT = Number(process.env.PORT) || 8888
 
 const envFile = path.join(PROJECT, '.env')
 if (!fs.existsSync(envFile)) {
-  console.error('缺少 .env，请先复制 .env.example 并填写 Supabase 配置')
+  console.error('缺少 .env，请先复制 .env.example 并填写 MySQL 与 JWT 配置')
   process.exit(1)
 }
 
@@ -140,5 +140,5 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`\n  动了没 · 本地全栈已启动`)
   console.log(`  http://127.0.0.1:${PORT}/\n`)
   console.log('  前端：dist 构建产物')
-  console.log('  接口：/.netlify/functions/*（真实 Supabase）\n')
+  console.log('  接口：/.netlify/functions/*（MySQL）\n')
 })
