@@ -4,29 +4,20 @@
 
 ## 线上地址
 
-### Netlify（GitHub 自动部署）
-
-- 用户端：<https://donglemei-lyf.netlify.app>
-- 后台入口：<https://donglemei-lyf.netlify.app/admin/login>
-- Supabase 代理：<https://donglemei-lyf.netlify.app/.netlify/functions/supabase-proxy>
-- 推送到 GitHub `main` 分支会自动触发 Netlify 构建部署。
-
-### AWS EC2（悉尼）
-
 - 用户端：<https://3.105.101.123.nip.io>
 - 后台入口：<https://3.105.101.123.nip.io/admin/login>
 - Supabase 代理：<https://3.105.101.123.nip.io/.netlify/functions/supabase-proxy>
 - 实例：Ubuntu 24.04 / t3.small / 弹性 IP `3.105.101.123`
 - SSH：`ssh -i D:\Edge\donglemei_new ubuntu@3.105.101.123`
 
-本地开发同样可访问 `http://127.0.0.1:8888`，前后端都已切到 Netlify 代理地址。
+本地开发同样可访问 `http://127.0.0.1:8888`，前后端都已切到 AWS 代理地址。
 
 ## 技术栈
 
 - 前端：Vue 3 + Vite + Vue Router + ECharts + Lucide 图标，手写设计系统（原生系统风 + 校园轻快），不使用 UI 框架
-- 后端：Netlify Functions（Node.js Serverless）
+- 后端：Node.js HTTP 服务，直接复用 `netlify/functions/` 下的 Handler
 - 数据库与身份：Supabase PostgreSQL + Supabase Auth
-- 部署：Netlify
+- 部署：AWS EC2 + Caddy（自动 HTTPS）+ systemd
 - PWA：vite-plugin-pwa
 
 ## 功能
@@ -44,7 +35,7 @@
 
 ### 1. 安装依赖
 
-需要 Node 20+。
+需要 Node 22+（supabase-js 需要原生 WebSocket）。
 
 ```bash
 npm install
@@ -70,11 +61,13 @@ copy .env.example .env
 填写：
 
 ```env
-VITE_SUPABASE_URL=https://xxxx.supabase.co
+# 前端与后端统一走反向代理，避免网络直连 supabase.co 被重置
+VITE_SUPABASE_URL=https://3.105.101.123.nip.io/.netlify/functions/supabase-proxy
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx
 
-SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_URL=https://3.105.101.123.nip.io/.netlify/functions/supabase-proxy
 SUPABASE_SECRET_KEY=sb_secret_xxx
+SUPABASE_PROJECT_URL=https://xxxx.supabase.co
 
 LLM_API_URL=https://api.siliconflow.cn/v1/chat/completions
 LLM_API_KEY=sk-xxx
@@ -87,76 +80,32 @@ LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
 
 ```bash
 npm install
-npx netlify login
-npx netlify dev
-```
-
-访问 `http://localhost:8888`。`netlify dev` 会同时代理 Vite 前端与 Netlify Functions。也可以直接运行 `npm run dev:full`。
-
-如果 `netlify dev` 在本机启动后端口无响应，用内置的本地全栈启动器：
-
-```bash
 npm run dev:local
 ```
 
-它会先构建，再用 Node 直接托管 `dist` 并调用 `netlify/functions/*`，访问 `http://127.0.0.1:8888`。已有 `dist` 时可以用 `npm run start:local` 跳过构建。
+它会先构建，再用 Node 托管 `dist` 并调用 `netlify/functions/*`，访问 `http://127.0.0.1:8888`。已有 `dist` 时可以用 `npm run start:local` 跳过构建。
 
 只调前端样式时也可以 `npm run dev`，但接口不可用。
 
-## 网络受限时：通过 Netlify 反向代理访问 Supabase
+## Supabase 反向代理
 
-部分网络会重置对 `*.supabase.co` 的 TCP 连接（浏览器可能靠 HTTP/3 偶尔打开，但 Node 后端只走 TCP，接口仍然会失败）。此时可以把 Supabase 的 HTTP 入口挂到自己的 Netlify 域名下：
+AWS 服务器上运行 `supabase-proxy.js`，前端与后端都不再直连 `*.supabase.co`：
 
 ```text
 浏览器 / 本地后端
-      │  https://你的站点.netlify.app/.netlify/functions/supabase-proxy/auth/v1/...
+      │  https://3.105.101.123.nip.io/.netlify/functions/supabase-proxy/auth/v1/...
       ▼
-Netlify Function（supabase-proxy.js）
-      │  转发到 https://你的项目.supabase.co/auth/v1/...
+AWS 上的 Node 服务（supabase-proxy.js）
+      │  转发到 https://cihlexedacjmujfyipxs.supabase.co/auth/v1/...
       ▼
 Supabase
 ```
 
-前端与后端都不再直连 `*.supabase.co`，只要网络能打开你的 Netlify 域名，就能正常登录和读写数据。
-
-### 配置步骤
-
-1. 在 Netlify 创建站点并部署本项目（见上一节）。
-2. 在 Site settings → Environment variables 增加：
-
-```bash
-SUPABASE_PROJECT_URL=https://xxxx.supabase.co
-```
-
-3. 把下面两个变量改为代理地址（注意结尾不要加 `/auth/v1`）：
-
-```bash
-VITE_SUPABASE_URL=https://你的站点.netlify.app/.netlify/functions/supabase-proxy
-SUPABASE_URL=https://你的站点.netlify.app/.netlify/functions/supabase-proxy
-```
-
-4. 本地 `.env` 使用同样的两个值并重新构建：`npm run dev:local`。
-5. 代理只放行 `/auth/v1/*` 与 `/rest/v1/*`，其余路径返回 404；`apikey` 与 `Authorization` 会原样透传，secret key 不会出现在浏览器。
-6. 切换到代理地址后，本地旧的登录态会失效（storage key 变化），重新登录一次即可。
-
-> 直连模式仍然保留：网络没有限制时，把两个 URL 改回 `https://xxxx.supabase.co` 并删除 `SUPABASE_PROJECT_URL` 也不会影响业务代码。
-
-## 部署到 Netlify
-
-1. 把仓库推到 GitHub，在 Netlify 中导入。
-2. 构建命令 `npm run build`，发布目录 `dist`（`netlify.toml` 已配置）。
-3. 在 Site settings → Environment variables 中逐条配置线上环境变量：
-
-```bash
-netlify env:set SUPABASE_URL https://xxxx.supabase.co
-netlify env:set SUPABASE_SECRET_KEY sb_secret_xxx
-netlify env:set VITE_SUPABASE_URL https://xxxx.supabase.co
-netlify env:set VITE_SUPABASE_PUBLISHABLE_KEY sb_publishable_xxx
-netlify env:set LLM_API_URL https://api.siliconflow.cn/v1/chat/completions
-netlify env:set LLM_API_KEY sk-xxx
-```
-
-4. 重新部署。`netlify.toml` 已包含 SPA fallback、Functions 目录与 CSP 安全头。
+- 前端 `VITE_SUPABASE_URL` 与后端 `SUPABASE_URL` 都填代理地址。
+- 代理函数读取 `SUPABASE_PROJECT_URL` 作为真实项目地址。
+- 只放行 `/auth/v1/*` 与 `/rest/v1/*`，透传 `apikey` 与 `Authorization`，secret key 不会出现在浏览器。
+- 切换代理后旧登录态会失效（storage key 变化），重新登录一次即可。
+- 网络没有限制时也可以把两个 URL 改回 `https://xxxx.supabase.co` 并删除 `SUPABASE_PROJECT_URL` 走直连。
 
 ## 部署到 AWS EC2
 
@@ -205,7 +154,7 @@ sudo systemctl restart donglemei
 - 后端函数使用 `SUPABASE_SECRET_KEY`，前端只使用 publishable key
 - 三张业务表开启 RLS，`weekly_rank` 视图设置 `security_invoker = true`，并 revoke 了 anon / authenticated 权限
 - 昵称使用白名单正则（中英文、数字、下划线、连字符），前端不使用 `v-html`
-- `netlify.toml` 配置 CSP、`X-Content-Type-Options`、`Referrer-Policy`
+- Caddy 配置 CSP、`X-Content-Type-Options`、`Referrer-Policy`
 
 ## 目录结构
 
@@ -213,15 +162,17 @@ sudo systemctl restart donglemei
 .
 ├── src/
 │   ├── pages/            # Auth / Onboarding / Home / Checkin / Stats / Rank / Summary / Mine
-│   ├── utils/            # supabase.js / api.js / sport.js
+│   ├── pages/admin/      # 后台页面
+│   ├── assets/           # 空状态与引导插画
+│   ├── utils/            # supabase.js / api.js / sport.js / ui.js
 │   ├── router/
 │   ├── styles/
 │   ├── App.vue
 │   └── main.js
-├── netlify/functions/    # db.js / checkin.js / stats.js / rank.js / summary.js / profile.js / admin.js / supabase-proxy.js
+├── netlify/functions/    # API Handler：db.js / checkin.js / stats.js / rank.js / summary.js / profile.js / admin.js / supabase-proxy.js
+├── scripts/local-server.cjs  # Node HTTP 服务：托管 dist 并调用 Handler
 ├── supabase/schema.sql
-├── public/               # PWA 图标
-├── netlify.toml
+├── public/               # PWA 图标、favicon、logo
 ├── vite.config.js
 └── .env.example
 ```
