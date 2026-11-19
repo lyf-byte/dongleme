@@ -1,34 +1,31 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, Lock, Mail } from 'lucide-vue-next'
+import { UserRound, ArrowLeft, ArrowRight, Lock } from 'lucide-vue-next'
 import { adminSignIn, adminSignOut } from '../../utils/auth'
 import { adminOverview, errorMessage } from '../../utils/api'
 import '../../styles/admin.css'
 
 const router = useRouter()
 
-const form = ref({ email: '', password: '' })
+const form = ref({ account: '', password: '' })
 const loading = ref(false)
 const errorText = ref('')
 
 function mapError(error) {
-  const message = (error?.message || '').toLowerCase()
-  if (message.includes('invalid login credentials')) return '邮箱或密码错误'
-  if (message.includes('email not confirmed')) return '邮箱尚未验证'
   return errorMessage(error, '登录失败，请稍后再试')
 }
 
 async function submit() {
   errorText.value = ''
-  if (!form.value.email.trim() || !form.value.password) {
-    errorText.value = '请输入管理员邮箱和密码'
+  if (!form.value.account.trim() || !form.value.password) {
+    errorText.value = '请输入管理员账号和密码'
     return
   }
 
   loading.value = true
   try {
-    const data = await adminSignIn(form.value.email.trim(), form.value.password)
+    const data = await adminSignIn(form.value.account.trim(), form.value.password)
     if (!data.user?.isAdmin) {
       await adminSignOut()
       errorText.value = '该账号不是管理员'
@@ -60,8 +57,8 @@ async function submit() {
       <form @submit.prevent="submit">
         <div class="form-card">
           <div class="form-row admin-login__row">
-            <Mail :size="18" class="admin-login__icon" />
-            <input v-model="form.email" type="email" placeholder="管理员邮箱" autocomplete="username" />
+            <UserRound :size="18" class="admin-login__icon" />
+            <input v-model="form.account" type="text" placeholder="管理员账号" autocomplete="username" />
           </div>
           <div class="form-row admin-login__row">
             <Lock :size="18" class="admin-login__icon" />

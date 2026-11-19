@@ -56,6 +56,13 @@ const addDays = (dateStr, days) => {
 
 const diffDays = (a, b) => Math.round((toUtc(a) - toUtc(b)) / 86400000)
 
+// 超过一天没有续上打卡时按 0 展示，避免断卡后仍显示旧的连续天数
+const effectiveStreak = (streak, lastCheckDate) => {
+  if (!lastCheckDate) return 0
+  const gap = diffDays(getToday(), String(lastCheckDate).slice(0, 10))
+  return gap === 0 || gap === 1 ? Number(streak) || 0 : 0
+}
+
 const getWeekStart = (dateStr = getToday()) => {
   const d = toUtc(dateStr)
   const diff = (d.getUTCDay() + 6) % 7
@@ -67,11 +74,12 @@ const mapUser = (row) => ({
   id: row.id,
   email: row.email || null,
   phone: row.phone || null,
-  account: row.email || row.phone || '',
+  username: row.username || null,
+  account: row.username || row.email || row.phone || '',
   nickname: row.nickname,
   weight: Number(row.weight),
   weeklyGoal: row.weekly_goal,
-  streak: row.streak,
+  streak: effectiveStreak(row.streak, row.last_check_date),
   isAdmin: Boolean(row.is_admin),
   onboarded: Boolean(row.onboarded),
   createdAt: row.created_at
@@ -92,7 +100,7 @@ const getUser = async (event) => {
   try {
     const payload = jwt.verify(token, JWT_SECRET)
     const [rows] = await pool.query(
-      `select id, email, phone, nickname, weight, weekly_goal, is_admin, onboarded,
+      `select id, email, phone, username, nickname, weight, weekly_goal, is_admin, onboarded,
               streak, last_check_date, created_at
        from users where id = ? limit 1`,
       [payload.sub]
@@ -119,6 +127,7 @@ module.exports = {
   addDays,
   diffDays,
   getWeekStart,
+  effectiveStreak,
   mapUser,
   signToken,
   getUser,

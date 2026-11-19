@@ -12,6 +12,7 @@ const {
 
 const PHONE_RE = /^1[3-9]\d{9}$/
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const USERNAME_RE = /^[A-Za-z0-9_]{3,20}$/
 
 const findUser = async (account) => {
   const value = String(account || '').trim()
@@ -24,6 +25,11 @@ const findUser = async (account) => {
     const [rows] = await pool.query('select * from users where email = ? limit 1', [email])
     return { row: rows[0] || null, type: 'email', value: email }
   }
+  if (USERNAME_RE.test(value)) {
+    const username = value.toLowerCase()
+    const [rows] = await pool.query('select * from users where username = ? limit 1', [username])
+    return { row: rows[0] || null, type: 'username', value: username }
+  }
   return { row: null, type: '', value }
 }
 
@@ -32,7 +38,9 @@ const register = async (body) => {
   const password = String(body.password || '')
   const { row: existing, type, value } = await findUser(account)
 
-  if (!type) return json(400, { message: '请输入正确的手机号或邮箱' })
+  if (type !== 'phone' && type !== 'email') {
+    return json(400, { message: '请输入正确的手机号或邮箱' })
+  }
   if (password.length < 6) return json(400, { message: '密码至少 6 位' })
   if (existing) {
     return json(409, {

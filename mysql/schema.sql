@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
   id CHAR(36) PRIMARY KEY,
   email VARCHAR(255) NULL,
   phone VARCHAR(20) NULL,
+  username VARCHAR(32) NULL,
   password_hash VARCHAR(255) NOT NULL,
   nickname VARCHAR(12) NOT NULL DEFAULT '运动新人',
   weight DECIMAL(5, 2) NOT NULL DEFAULT 60,
@@ -22,6 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_users_email (email),
   UNIQUE KEY uk_users_phone (phone),
+  UNIQUE KEY uk_users_username (username),
   CONSTRAINT chk_users_nickname CHECK (CHAR_LENGTH(nickname) BETWEEN 1 AND 12),
   CONSTRAINT chk_users_weight CHECK (weight BETWEEN 20 AND 300),
   CONSTRAINT chk_users_goal CHECK (weekly_goal BETWEEN 1 AND 2000)

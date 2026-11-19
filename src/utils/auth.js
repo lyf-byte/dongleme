@@ -86,14 +86,26 @@ const requestAuth = async (action, payload, token, method = 'POST') => {
   return data
 }
 
+// 动态引入，避免 auth 与 api 互相静态依赖
+async function resetApiCache() {
+  try {
+    const { clearApiCache } = await import('./api')
+    clearApiCache()
+  } catch {
+    /* 缓存模块尚未加载时无需处理 */
+  }
+}
+
 export async function signIn(account, password) {
   const data = await requestAuth('login', { account, password })
+  await resetApiCache()
   saveSession(data)
   return data
 }
 
 export async function signUp(account, password) {
   const data = await requestAuth('register', { account, password })
+  await resetApiCache()
   saveSession(data)
   return data
 }
@@ -110,6 +122,7 @@ export async function adminSignIn(account, password) {
 }
 
 export async function signOut() {
+  await resetApiCache()
   clearSession()
 }
 

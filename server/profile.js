@@ -5,7 +5,8 @@ const {
   requireUser,
   parseBody,
   getToday,
-  getWeekStart
+  getWeekStart,
+  effectiveStreak
 } = require('./db')
 
 const NICKNAME_RE = /^[\u4e00-\u9fa5A-Za-z0-9_-]{1,12}$/
@@ -14,7 +15,7 @@ const mapProfile = (row) => ({
   nickname: row.nickname,
   weight: Number(row.weight),
   weeklyGoal: row.weekly_goal,
-  streak: row.streak,
+  streak: effectiveStreak(row.streak, row.last_check_date),
   createdAt: row.created_at
 })
 
@@ -37,7 +38,8 @@ exports.handler = async (event) => {
 
   if (event.httpMethod === 'GET') {
     const [profileRows] = await pool.query(
-      'select nickname, weight, weekly_goal, streak, created_at from users where id = ? limit 1',
+      `select nickname, weight, weekly_goal, streak, last_check_date, created_at
+       from users where id = ? limit 1`,
       [user.id]
     )
     if (!profileRows[0]) return json(404, { message: '用户不存在' })

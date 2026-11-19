@@ -7,7 +7,7 @@ const {
   getWeekStart
 } = require('./db')
 
-const accountOf = (row) => row.email || row.phone || '—'
+const accountOf = (row) => row.username || row.email || row.phone || '—'
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return noContent()
@@ -64,11 +64,11 @@ exports.handler = async (event) => {
 
       const [rows] = await pool.query(
         `select u.id, u.nickname, u.weight, u.weekly_goal, u.streak, u.is_admin,
-                u.created_at, u.email, u.phone, count(r.id) as record_count
+                u.created_at, u.email, u.phone, u.username, count(r.id) as record_count
          from users u
          left join records r on r.user_id = u.id
          group by u.id, u.nickname, u.weight, u.weekly_goal, u.streak, u.is_admin,
-                  u.created_at, u.email, u.phone
+                  u.created_at, u.email, u.phone, u.username
          order by u.created_at desc
          limit 500`
       )

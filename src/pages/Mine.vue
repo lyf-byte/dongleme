@@ -36,7 +36,7 @@ async function load() {
     }
 
     const user = getUser()
-    account.value = user?.phone || user?.email || '未绑定账号'
+    account.value = user?.username || user?.phone || user?.email || '未绑定账号'
   } catch (error) {
     toast(errorMessage(error, '加载资料失败'))
   } finally {
@@ -85,7 +85,7 @@ async function exportData() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `donglemei-${todayShanghai()}.json`
+    link.download = `dongleme-${todayShanghai()}.json`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
