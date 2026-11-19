@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { supabase, signOut, adminSupabase, adminSignOut } from './supabase'
+import { getToken, getAdminToken, signOut, adminSignOut } from './auth'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE || '/.netlify/functions',
@@ -32,37 +32,35 @@ export function clearApiCache() {
   summaryCacheAt = 0
 }
 
-api.interceptors.request.use(async (config) => {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
+api.interceptors.request.use((config) => {
+  const token = getToken()
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
+  (error) => {
     if (error.response?.status === 401) {
       clearApiCache()
-      await signOut()
+      signOut()
       if (window.location.pathname !== '/auth') window.location.replace('/auth')
     }
     return Promise.reject(error)
   }
 )
 
-adminApi.interceptors.request.use(async (config) => {
-  const { data } = await adminSupabase.auth.getSession()
-  const token = data.session?.access_token
+adminApi.interceptors.request.use((config) => {
+  const token = getAdminToken()
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
 adminApi.interceptors.response.use(
   (response) => response,
-  async (error) => {
+  (error) => {
     if (error.response?.status === 401) {
-      await adminSignOut()
+      adminSignOut()
       if (window.location.pathname.startsWith('/admin')) {
         window.location.replace('/admin/login')
       }
@@ -112,8 +110,7 @@ export async function getProfile(params) {
     return api.get('/profile', { params }).then((res) => res.data)
   }
 
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token || ''
+  const token = getToken()
 
   if (profileCache && profileCacheToken === token && Date.now() - profileCacheAt < PROFILE_TTL) {
     return profileCache

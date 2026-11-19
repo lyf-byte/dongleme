@@ -1,4 +1,4 @@
-const { supabase, json, noContent, requireUser } = require('./db')
+const { pool, json, noContent, requireUser, getWeekStart } = require('./db')
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return noContent()
@@ -7,33 +7,34 @@ exports.handler = async (event) => {
   const { user, error: authError } = await requireUser(event)
   if (authError) return authError
 
-  const { data, error } = await supabase
-    .from('weekly_rank')
-    .select('id, nickname, weekly_minutes')
-    .order('weekly_minutes', { ascending: false })
+  const weekStart = getWeekStart()
+  const [rows] = await pool.query(
+    `select u.id, u.nickname, coalesce(sum(r.duration), 0) as weekly_minutes
+     from users u
+     join records r on r.user_id = u.id and r.date >= ?
+     group by u.id, u.nickname
+     order by weekly_minutes desc, u.nickname asc`,
+    [weekStart]
+  )
 
-  if (error) return json(500, { message: '读取排行榜失败' })
-
-  const rows = (data || []).map((row) => ({
+  const list = rows.map((row) => ({
     id: row.id,
     nickname: row.nickname || '运动新人',
     weeklyMinutes: Number(row.weekly_minutes) || 0
   }))
 
-  const index = rows.findIndex((row) => row.id === user.id)
+  const index = list.findIndex((row) => row.id === user.id)
   const me =
     index >= 0
       ? {
           rank: index + 1,
-          minutes: rows[index].weeklyMinutes,
-          gap: index > 0 ? rows[index - 1].weeklyMinutes - rows[index].weeklyMinutes : 0
+          minutes: list[index].weeklyMinutes,
+          gap: index > 0 ? list[index - 1].weeklyMinutes - list[index].weeklyMinutes : 0
         }
       : null
 
-  const list = rows.slice(0, 20).map((row) => ({
-    ...row,
-    isMe: row.id === user.id
-  }))
-
-  return json(200, { list, me })
+  return json(200, {
+    list: list.slice(0, 20).map((row) => ({ ...row, isMe: row.id === user.id })),
+    me
+  })
 }

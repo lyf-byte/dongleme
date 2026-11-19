@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowRight, Eye, EyeOff, Lock, ShieldCheck, UserRound } from 'lucide-vue-next'
-import { supabase, isConfigured } from '../utils/supabase'
+import { signIn, signUp } from '../utils/auth'
 import authHero from '../assets/auth-hero.svg'
 
 const route = useRoute()
@@ -43,22 +43,9 @@ function setMode(value) {
   errorText.value = ''
 }
 
-function mapError(message = '') {
-  const text = message.toLowerCase()
-  if (text.includes('already registered') || text.includes('already been registered')) {
-    if (accountType.value === 'phone') return '该手机号已注册，请直接登录'
-    if (accountType.value === 'email') return '该邮箱已注册，请直接登录'
-    return '该账号已注册，请直接登录'
-  }
-  if (text.includes('invalid login credentials')) return '账号或密码错误'
-  if (text.includes('password should be at least')) return '密码至少 6 位'
-  if (text.includes('email not confirmed')) return '邮箱尚未验证，请到邮箱完成验证'
-  if (text.includes('email address') && text.includes('invalid')) {
-    return '这个邮箱地址不可用，请换一个常用邮箱'
-  }
-  if (text.includes('unable to validate email')) return '手机号或邮箱格式不正确'
-  if (text.includes('rate limit') || text.includes('too many')) return '操作太频繁，请稍后再试'
-  if (text.includes('fetch')) return '网络异常，请检查网络后重试'
+function mapError(error) {
+  const message = error?.message || ''
+  if (message.toLowerCase().includes('failed to fetch')) return '网络异常，请检查网络后重试'
   return message || '操作失败，请稍后再试'
 }
 
@@ -74,10 +61,9 @@ function validate() {
   return ''
 }
 
-async function afterAuth(session) {
+async function afterAuth(user) {
   const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
-  const onboarded = session?.user?.user_metadata?.onboarded === true
-  if (!onboarded) {
+  if (!user?.onboarded) {
     router.replace({ path: '/onboarding', query: redirect ? { redirect } : {} })
     return
   }
@@ -86,10 +72,6 @@ async function afterAuth(session) {
 
 async function onSubmit() {
   errorText.value = ''
-  if (!isConfigured) {
-    errorText.value = '尚未配置 Supabase，请先填写 .env 并重启项目'
-    return
-  }
   const message = validate()
   if (message) {
     errorText.value = message
@@ -99,35 +81,15 @@ async function onSubmit() {
   loading.value = true
   try {
     const account = form.value.account.trim()
-    const isPhone = accountType.value === 'phone'
-    const email = isPhone ? `${account}@phone.dlm.app` : account
-
     if (mode.value === 'register') {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password: form.value.password,
-        options: {
-          data: isPhone
-            ? { phone: account, login_type: 'phone', onboarded: false }
-            : { login_type: 'email', onboarded: false }
-        }
-      })
-      if (error) throw error
-      if (!data.session) {
-        errorText.value = '注册成功，但当前需要邮箱验证。请在 Supabase 关闭 Confirm email 后再试'
-        return
-      }
-      await afterAuth(data.session)
+      const data = await signUp(account, form.value.password)
+      await afterAuth(data.user)
     } else {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: form.value.password
-      })
-      if (error) throw error
-      await afterAuth(data.session)
+      const data = await signIn(account, form.value.password)
+      await afterAuth(data.user)
     }
   } catch (error) {
-    errorText.value = mapError(error?.message || '')
+    errorText.value = mapError(error)
   } finally {
     loading.value = false
   }

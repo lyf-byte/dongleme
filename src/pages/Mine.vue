@@ -1,15 +1,9 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronRight, Download, Flame, LogOut, Trash2 } from 'lucide-vue-next'
-import {
-  getProfile,
-  updateProfile,
-  clearRecords,
-  clearApiCache,
-  errorMessage
-} from '../utils/api'
-import { getSession, signOut } from '../utils/supabase'
+import { ChevronRight, Download, Flame, Lock, LogOut, Trash2 } from 'lucide-vue-next'
+import { getProfile, updateProfile, clearRecords, clearApiCache, errorMessage } from '../utils/api'
+import { getUser, signOut, changePassword } from '../utils/auth'
 import { todayShanghai } from '../utils/sport'
 import { toast, confirmDialog } from '../utils/ui'
 
@@ -33,7 +27,7 @@ const totals = computed(() => [
 async function load() {
   loading.value = true
   try {
-    const [data, sessionResult] = await Promise.all([getProfile(), getSession()])
+    const data = await getProfile()
     profile.value = data
     form.value = {
       nickname: data.nickname,
@@ -41,11 +35,8 @@ async function load() {
       weeklyGoal: data.weeklyGoal
     }
 
-    const user = sessionResult.data.session?.user
-    const email = user?.email || ''
-    const phone = user?.user_metadata?.phone
-    account.value =
-      phone || (email.endsWith('@phone.dlm.app') ? email.split('@')[0] : email) || '未绑定账号'
+    const user = getUser()
+    account.value = user?.phone || user?.email || '未绑定账号'
   } catch (error) {
     toast(errorMessage(error, '加载资料失败'))
   } finally {
@@ -140,9 +131,47 @@ async function logout() {
   }
   try {
     clearApiCache()
-    await signOut()
+    signOut()
   } finally {
     router.replace('/auth')
+  }
+}
+
+const pwdOpen = ref(false)
+const pwdSaving = ref(false)
+const pwdError = ref('')
+const pwdForm = ref({ oldPassword: '', newPassword: '', confirm: '' })
+
+function togglePassword() {
+  pwdOpen.value = !pwdOpen.value
+  pwdError.value = ''
+}
+
+async function savePassword() {
+  pwdError.value = ''
+  if (!pwdForm.value.oldPassword) {
+    pwdError.value = '请输入原密码'
+    return
+  }
+  if (pwdForm.value.newPassword.length < 6) {
+    pwdError.value = '新密码至少 6 位'
+    return
+  }
+  if (pwdForm.value.newPassword !== pwdForm.value.confirm) {
+    pwdError.value = '两次输入的新密码不一致'
+    return
+  }
+
+  pwdSaving.value = true
+  try {
+    await changePassword(pwdForm.value.oldPassword, pwdForm.value.newPassword)
+    pwdForm.value = { oldPassword: '', newPassword: '', confirm: '' }
+    pwdOpen.value = false
+    toast('密码已修改')
+  } catch (error) {
+    pwdError.value = errorMessage(error, '修改密码失败')
+  } finally {
+    pwdSaving.value = false
   }
 }
 
@@ -214,6 +243,52 @@ onMounted(load)
       <button type="button" class="btn-primary save-btn" :disabled="saving" @click="save">
         {{ saving ? '保存中…' : '保存修改' }}
       </button>
+
+      <div class="section-title">
+        <h2>账号安全</h2>
+      </div>
+
+      <div class="list-card">
+        <button type="button" class="list-row" @click="togglePassword">
+          <span class="list-icon list-icon--blue"><Lock :size="18" /></span>
+          <span class="list-text">
+            <strong>修改密码</strong>
+            <small>定期更换更安全</small>
+          </span>
+          <ChevronRight :size="18" class="chev" />
+        </button>
+      </div>
+
+      <template v-if="pwdOpen">
+        <div class="form-card">
+          <div class="form-row">
+            <span class="form-row__label">原密码</span>
+            <input v-model="pwdForm.oldPassword" type="password" autocomplete="current-password" />
+          </div>
+          <div class="form-row">
+            <span class="form-row__label">新密码</span>
+            <input
+              v-model="pwdForm.newPassword"
+              type="password"
+              autocomplete="new-password"
+              placeholder="至少 6 位"
+            />
+          </div>
+          <div class="form-row">
+            <span class="form-row__label">确认</span>
+            <input
+              v-model="pwdForm.confirm"
+              type="password"
+              autocomplete="new-password"
+              placeholder="再次输入新密码"
+            />
+          </div>
+        </div>
+        <p v-if="pwdError" class="form-error">{{ pwdError }}</p>
+        <button type="button" class="btn-primary save-btn" :disabled="pwdSaving" @click="savePassword">
+          {{ pwdSaving ? '保存中…' : '确认修改' }}
+        </button>
+      </template>
 
       <div class="section-title">
         <h2>数据管理</h2>

@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, ArrowRight, Lock, Mail } from 'lucide-vue-next'
-import { adminSupabase, adminSignOut } from '../../utils/supabase'
+import { adminSignIn, adminSignOut } from '../../utils/auth'
 import { adminOverview, errorMessage } from '../../utils/api'
 import '../../styles/admin.css'
 
@@ -28,13 +28,8 @@ async function submit() {
 
   loading.value = true
   try {
-    const { data, error } = await adminSupabase.auth.signInWithPassword({
-      email: form.value.email.trim(),
-      password: form.value.password
-    })
-    if (error) throw error
-
-    if (data.session?.user?.user_metadata?.is_admin !== true) {
+    const data = await adminSignIn(form.value.email.trim(), form.value.password)
+    if (!data.user?.isAdmin) {
       await adminSignOut()
       errorText.value = '该账号不是管理员'
       return
@@ -43,7 +38,7 @@ async function submit() {
     await adminOverview()
     router.replace('/admin')
   } catch (error) {
-    if (error?.response?.status === 403) {
+    if (error?.response?.status === 403 || error?.status === 403) {
       await adminSignOut()
       errorText.value = '该账号没有管理员权限'
       return

@@ -1,11 +1,4 @@
-const {
-  supabase,
-  json,
-  noContent,
-  requireUser,
-  getToday,
-  addDays
-} = require('./db')
+const { pool, json, noContent, requireUser, getToday, addDays } = require('./db')
 
 const RANGES = ['7d', '30d', 'month']
 
@@ -24,14 +17,11 @@ exports.handler = async (event) => {
   if (range === '30d') start = addDays(today, -29)
   if (range === 'month') start = `${today.slice(0, 7)}-01`
 
-  const { data: rows, error } = await supabase
-    .from('records')
-    .select('date, type, duration, calories')
-    .eq('user_id', user.id)
-    .gte('date', start)
-    .lte('date', today)
-
-  if (error) return json(500, { message: '读取统计数据失败' })
+  const [rows] = await pool.query(
+    `select date, type, duration, calories from records
+     where user_id = ? and date >= ? and date <= ?`,
+    [user.id, start, today]
+  )
 
   const dayMap = new Map()
   const typeMap = {}
@@ -39,7 +29,7 @@ exports.handler = async (event) => {
   let minutes = 0
   let calories = 0
 
-  for (const row of rows || []) {
+  for (const row of rows) {
     const duration = Number(row.duration) || 0
     const kcal = Number(row.calories) || 0
     count += 1

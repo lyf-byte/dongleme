@@ -1,10 +1,21 @@
-const { createClient } = require('@supabase/supabase-js')
+const mysql = require('mysql2/promise')
+const jwt = require('jsonwebtoken')
 
-const secretKey =
-  process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) throw new Error('缺少 JWT_SECRET 环境变量')
 
-const supabase = createClient(process.env.SUPABASE_URL, secretKey, {
-  auth: { persistSession: false, autoRefreshToken: false }
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || '127.0.0.1',
+  port: Number(process.env.DB_PORT || 3306),
+  user: process.env.DB_USER || 'dlm',
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || 'donglemei',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  charset: 'utf8mb4',
+  dateStrings: true,
+  decimalNumbers: true
 })
 
 const CORS = {
@@ -20,37 +31,6 @@ const json = (statusCode, body) => ({
 })
 
 const noContent = () => ({ statusCode: 204, headers: CORS, body: '' })
-
-const userCache = new Map()
-const USER_CACHE_TTL = 60 * 1000
-
-const getUser = async (event) => {
-  const header = event.headers?.authorization || event.headers?.Authorization || ''
-  const token = header.startsWith('Bearer ') ? header.slice(7) : ''
-  if (!token) return null
-
-  const now = Date.now()
-  const cached = userCache.get(token)
-  if (cached && cached.expiresAt > now) return cached.user
-
-  const { data, error } = await supabase.auth.getUser(token)
-  if (error || !data?.user) return null
-
-  userCache.set(token, { user: data.user, expiresAt: now + USER_CACHE_TTL })
-  if (userCache.size > 500) {
-    for (const [key, value] of userCache) {
-      if (value.expiresAt <= now) userCache.delete(key)
-    }
-  }
-
-  return data.user
-}
-
-const requireUser = async (event) => {
-  const user = await getUser(event)
-  if (!user) return { error: json(401, { message: '登录已过期，请重新登录' }) }
-  return { user }
-}
 
 const parseBody = (event) => {
   try {
@@ -83,15 +63,64 @@ const getWeekStart = (dateStr = getToday()) => {
   return fromUtc(d)
 }
 
+const mapUser = (row) => ({
+  id: row.id,
+  email: row.email || null,
+  phone: row.phone || null,
+  account: row.email || row.phone || '',
+  nickname: row.nickname,
+  weight: Number(row.weight),
+  weeklyGoal: row.weekly_goal,
+  streak: row.streak,
+  isAdmin: Boolean(row.is_admin),
+  onboarded: Boolean(row.onboarded),
+  createdAt: row.created_at
+})
+
+const signToken = (row) =>
+  jwt.sign(
+    { sub: row.id, isAdmin: Boolean(row.is_admin) },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  )
+
+const getUser = async (event) => {
+  const header = event.headers?.authorization || event.headers?.Authorization || ''
+  const token = header.startsWith('Bearer ') ? header.slice(7) : ''
+  if (!token) return null
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET)
+    const [rows] = await pool.query(
+      `select id, email, phone, nickname, weight, weekly_goal, is_admin, onboarded,
+              streak, last_check_date, created_at
+       from users where id = ? limit 1`,
+      [payload.sub]
+    )
+    return rows[0] ? mapUser(rows[0]) : null
+  } catch {
+    return null
+  }
+}
+
+const requireUser = async (event) => {
+  const user = await getUser(event)
+  if (!user) return { error: json(401, { message: '登录已过期，请重新登录' }) }
+  return { user }
+}
+
 module.exports = {
-  supabase,
+  pool,
+  JWT_SECRET,
   json,
   noContent,
-  getUser,
-  requireUser,
   parseBody,
   getToday,
   addDays,
   diffDays,
-  getWeekStart
+  getWeekStart,
+  mapUser,
+  signToken,
+  getUser,
+  requireUser
 }

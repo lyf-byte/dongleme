@@ -1,5 +1,5 @@
 const {
-  supabase,
+  pool,
   json,
   noContent,
   requireUser,
@@ -36,58 +36,39 @@ exports.handler = async (event) => {
   if (authError) return authError
 
   if (event.httpMethod === 'GET') {
-    const [profileResult, recordsResult] = await Promise.all([
-      supabase
-        .from('users')
-        .select('nickname, weight, weekly_goal, streak, created_at')
-        .eq('id', user.id)
-        .maybeSingle(),
-      supabase
-        .from('records')
-        .select('date, type, duration, calories')
-        .eq('user_id', user.id)
-        .order('date', { ascending: true })
-    ])
+    const [profileRows] = await pool.query(
+      'select nickname, weight, weekly_goal, streak, created_at from users where id = ? limit 1',
+      [user.id]
+    )
+    if (!profileRows[0]) return json(404, { message: '用户不存在' })
 
-    let profileRow = profileResult.data
-    if (profileResult.error) return json(500, { message: '读取用户信息失败' })
+    const [rows] = await pool.query(
+      'select date, type, duration, calories from records where user_id = ? order by date asc',
+      [user.id]
+    )
 
-    if (!profileRow) {
-      const { data: created, error: createError } = await supabase
-        .from('users')
-        .insert({ id: user.id })
-        .select('nickname, weight, weekly_goal, streak, created_at')
-        .single()
-
-      if (createError) return json(500, { message: '初始化用户失败' })
-      profileRow = created
-    }
-
-    if (recordsResult.error) return json(500, { message: '读取打卡记录失败' })
-    const rows = recordsResult.data
+    const profileRow = profileRows[0]
 
     if (event.queryStringParameters?.export === '1') {
-      const { data: summaries } = await supabase
-        .from('summaries')
-        .select('week_start, content, created_at')
-        .eq('user_id', user.id)
-        .order('week_start', { ascending: true })
+      const [summaries] = await pool.query(
+        'select week_start, content, created_at from summaries where user_id = ? order by week_start asc',
+        [user.id]
+      )
 
       return json(200, {
         profile: mapProfile(profileRow),
-        records: rows || [],
-        summaries: summaries || []
+        records: rows,
+        summaries
       })
     }
 
     const today = getToday()
     const weekStart = getWeekStart(today)
-    const allRows = rows || []
 
-    const todayTotals = sumRows(allRows.filter((row) => row.date === today))
-    const weekTotals = sumRows(allRows.filter((row) => row.date >= weekStart))
-    const totalTotals = sumRows(allRows)
-    const weekDays = [...new Set(allRows.filter((row) => row.date >= weekStart).map((row) => row.date))]
+    const todayTotals = sumRows(rows.filter((row) => row.date === today))
+    const weekTotals = sumRows(rows.filter((row) => row.date >= weekStart))
+    const totalTotals = sumRows(rows)
+    const weekDays = [...new Set(rows.filter((row) => row.date >= weekStart).map((row) => row.date))]
 
     return json(200, {
       ...mapProfile(profileRow),
@@ -117,44 +98,32 @@ exports.handler = async (event) => {
       return json(400, { message: '周目标需为 1–2000 的整数' })
     }
 
-    const { error } = await supabase.from('users').upsert(
-      {
-        id: user.id,
-        nickname,
-        weight,
-        weekly_goal: weeklyGoal
-      },
-      { onConflict: 'id' }
+    await pool.query(
+      'update users set nickname = ?, weight = ?, weekly_goal = ? where id = ?',
+      [nickname, weight, weeklyGoal, user.id]
     )
-
-    if (error) return json(500, { message: '保存资料失败' })
 
     return json(200, { nickname, weight, weeklyGoal })
   }
 
   if (event.httpMethod === 'DELETE') {
-    const { error: recordsError } = await supabase
-      .from('records')
-      .delete()
-      .eq('user_id', user.id)
-
-    const { error: summariesError } = await supabase
-      .from('summaries')
-      .delete()
-      .eq('user_id', user.id)
-
-    if (recordsError || summariesError) {
+    const conn = await pool.getConnection()
+    try {
+      await conn.beginTransaction()
+      await conn.query('delete from records where user_id = ?', [user.id])
+      await conn.query('delete from summaries where user_id = ?', [user.id])
+      await conn.query(
+        'update users set streak = 0, last_check_date = null where id = ?',
+        [user.id]
+      )
+      await conn.commit()
+      return json(200, { ok: true })
+    } catch {
+      await conn.rollback()
       return json(500, { message: '清空数据失败' })
+    } finally {
+      conn.release()
     }
-
-    const { error: userError } = await supabase
-      .from('users')
-      .update({ streak: 0, last_check_date: null })
-      .eq('id', user.id)
-
-    if (userError) return json(500, { message: '重置连续打卡失败' })
-
-    return json(200, { ok: true })
   }
 
   return json(405, { message: 'Method Not Allowed' })

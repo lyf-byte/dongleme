@@ -1,5 +1,5 @@
 const {
-  supabase,
+  pool,
   json,
   noContent,
   requireUser,
@@ -30,14 +30,11 @@ exports.handler = async (event) => {
   const weekStart = getWeekStart()
   const today = getToday()
 
-  const { data: cached, error: cacheError } = await supabase
-    .from('summaries')
-    .select('content, regen_count')
-    .eq('user_id', user.id)
-    .eq('week_start', weekStart)
-    .maybeSingle()
-
-  if (cacheError) return json(500, { message: '读取小结缓存失败' })
+  const [cachedRows] = await pool.query(
+    'select content, regen_count from summaries where user_id = ? and week_start = ? limit 1',
+    [user.id, weekStart]
+  )
+  const cached = cachedRows[0]
 
   if (body.peek === true) {
     return json(200, {
@@ -57,23 +54,14 @@ exports.handler = async (event) => {
     })
   }
 
-  const { data: rows, error } = await supabase
-    .from('records')
-    .select('date, type, duration, calories')
-    .eq('user_id', user.id)
-    .gte('date', weekStart)
-    .lte('date', today)
+  const [rows] = await pool.query(
+    `select date, type, duration, calories from records
+     where user_id = ? and date >= ? and date <= ?`,
+    [user.id, weekStart, today]
+  )
 
-  if (error) return json(500, { message: '读取本周数据失败' })
-
-  const stats = {
-    count: 0,
-    minutes: 0,
-    calories: 0,
-    types: {}
-  }
-
-  for (const row of rows || []) {
+  const stats = { count: 0, minutes: 0, calories: 0, types: {} }
+  for (const row of rows) {
     stats.count += 1
     stats.minutes += Number(row.duration) || 0
     stats.calories += Number(row.calories) || 0
@@ -126,20 +114,15 @@ exports.handler = async (event) => {
 
     const payload = await response.json()
     const content = payload?.choices?.[0]?.message?.content?.trim()
-
     if (!content) throw new Error('LLM empty content')
 
-    await supabase
-      .from('summaries')
-      .upsert(
-        {
-          user_id: user.id,
-          week_start: weekStart,
-          content,
-          regen_count: cached && body.force === true ? cached.regen_count + 1 : 0
-        },
-        { onConflict: 'user_id,week_start' }
-      )
+    const regenCount = cached && body.force === true ? cached.regen_count + 1 : 0
+    await pool.query(
+      `insert into summaries (user_id, week_start, content, regen_count)
+       values (?, ?, ?, ?)
+       on duplicate key update content = values(content), regen_count = values(regen_count)`,
+      [user.id, weekStart, content, regenCount]
+    )
 
     return json(200, { weekStart, content, cached: false })
   } catch {

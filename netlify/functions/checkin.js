@@ -1,5 +1,5 @@
 const {
-  supabase,
+  pool,
   json,
   noContent,
   requireUser,
@@ -36,13 +36,12 @@ exports.handler = async (event) => {
     return json(400, { message: '时长必须是 1–600 的整数' })
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from('users')
-    .select('weight, streak, last_check_date')
-    .eq('id', user.id)
-    .single()
-
-  if (profileError || !profile) return json(500, { message: '读取用户信息失败' })
+  const [profileRows] = await pool.query(
+    'select weight, streak, last_check_date from users where id = ? limit 1',
+    [user.id]
+  )
+  const profile = profileRows[0]
+  if (!profile) return json(404, { message: '用户不存在' })
 
   const weight = Number(body.weight ?? profile.weight ?? 60)
   if (!Number.isFinite(weight) || weight < 20 || weight > 300) {
@@ -51,37 +50,54 @@ exports.handler = async (event) => {
 
   const today = getToday()
   const calories = Math.round(met * weight * (duration / 60))
-  const record = { user_id: user.id, date: today, type, duration, calories }
+  const overwrite = body.overwrite === true
 
-  if (body.overwrite === true) {
-    const { error } = await supabase
-      .from('records')
-      .upsert(record, { onConflict: 'user_id,date,type' })
-    if (error) return json(500, { message: '保存打卡记录失败' })
-  } else {
-    const { error } = await supabase.from('records').insert(record)
-    if (error) {
-      if (error.code === '23505') {
-        return json(409, { message: '今日已打卡该类型' })
+  const conn = await pool.getConnection()
+  try {
+    await conn.beginTransaction()
+
+    if (overwrite) {
+      await conn.query(
+        `insert into records (user_id, date, type, duration, calories)
+         values (?, ?, ?, ?, ?)
+         on duplicate key update duration = values(duration), calories = values(calories)`,
+        [user.id, today, type, duration, calories]
+      )
+    } else {
+      try {
+        await conn.query(
+          'insert into records (user_id, date, type, duration, calories) values (?, ?, ?, ?, ?)',
+          [user.id, today, type, duration, calories]
+        )
+      } catch (error) {
+        await conn.rollback()
+        if (error.code === 'ER_DUP_ENTRY') {
+          return json(409, { message: '今日已打卡该类型' })
+        }
+        throw error
       }
-      return json(500, { message: '保存打卡记录失败' })
     }
+
+    const last = profile.last_check_date
+    let streak = 1
+    if (last === today) {
+      streak = profile.streak || 1
+    } else if (last && diffDays(today, String(last).slice(0, 10)) === 1) {
+      streak = (profile.streak || 0) + 1
+    }
+
+    await conn.query('update users set streak = ?, last_check_date = ? where id = ?', [
+      streak,
+      today,
+      user.id
+    ])
+    await conn.commit()
+
+    return json(200, { date: today, duration, calories, streak })
+  } catch {
+    await conn.rollback()
+    return json(500, { message: '保存打卡记录失败' })
+  } finally {
+    conn.release()
   }
-
-  const last = profile.last_check_date
-  let streak = 1
-  if (last === today) {
-    streak = profile.streak || 1
-  } else if (last && diffDays(today, last) === 1) {
-    streak = (profile.streak || 0) + 1
-  }
-
-  const { error: streakError } = await supabase
-    .from('users')
-    .update({ streak, last_check_date: today })
-    .eq('id', user.id)
-
-  if (streakError) return json(500, { message: '更新连续打卡失败' })
-
-  return json(200, { date: today, duration, calories, streak })
 }

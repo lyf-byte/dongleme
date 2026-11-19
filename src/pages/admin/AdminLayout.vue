@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ClipboardList, LayoutDashboard, LogOut, Trophy, Users } from 'lucide-vue-next'
-import { getAdminSession, adminSignOut } from '../../utils/supabase'
+import { getAdminUser, adminSignOut } from '../../utils/auth'
 import { confirmDialog } from '../../utils/ui'
 import '../../styles/admin.css'
 
@@ -37,10 +37,9 @@ async function logout() {
   router.replace('/admin/login')
 }
 
-onMounted(async () => {
-  const { data } = await getAdminSession()
-  const user = data.session?.user
-  account.value = user?.email || user?.user_metadata?.phone || ''
+onMounted(() => {
+  const user = getAdminUser()
+  account.value = user?.email || user?.phone || ''
 })
 </script>
 

@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { getSession, getAdminSession } from '../utils/supabase'
+import { getAuthState, getAdminAuthState } from '../utils/auth'
 
 const routes = [
   {
@@ -59,30 +59,28 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach(async (to) => {
+router.beforeEach((to) => {
   if (to.path.startsWith('/admin')) {
-    const { data } = await getAdminSession()
-    const adminSession = data.session
-    const isAdmin = adminSession?.user?.user_metadata?.is_admin === true
+    const { user: adminUser } = getAdminAuthState()
+    const isAdmin = adminUser?.isAdmin === true
 
     if (to.path === '/admin/login') {
       return isAdmin ? '/admin' : true
     }
-    if (!adminSession) return { path: '/admin/login' }
+    if (!adminUser) return { path: '/admin/login' }
     if (!isAdmin) return { path: '/admin/login', query: { error: 'forbidden' } }
     return true
   }
 
-  const { data } = await getSession()
-  const session = data.session
-  const onboarded = session?.user?.user_metadata?.onboarded === true
+  const { user } = getAuthState()
+  const onboarded = user?.onboarded === true
 
   if (to.meta.public) {
-    if (!session) return true
+    if (!user) return true
     return onboarded ? '/' : '/onboarding'
   }
 
-  if (!session) {
+  if (!user) {
     return { path: '/auth', query: { redirect: to.fullPath } }
   }
   if (!onboarded && to.path !== '/onboarding') {

@@ -31,15 +31,7 @@ for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
 }
 
 const handlers = {}
-const allowed = new Set([
-  'profile',
-  'checkin',
-  'stats',
-  'rank',
-  'summary',
-  'admin',
-  'supabase-proxy'
-])
+const allowed = new Set(['profile', 'checkin', 'stats', 'rank', 'summary', 'admin', 'auth'])
 
 function getHandler(name) {
   if (!handlers[name]) {

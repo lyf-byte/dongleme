@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowRight } from 'lucide-vue-next'
-import { supabase } from '../utils/supabase'
+import { completeOnboarding } from '../utils/auth'
 import { updateProfile, errorMessage } from '../utils/api'
 import { toast } from '../utils/ui'
 import onboardingArt from '../assets/onboarding.svg'
@@ -38,7 +38,7 @@ async function submit() {
   loading.value = true
   try {
     await updateProfile({ nickname, weight, weeklyGoal })
-    await supabase.auth.updateUser({ data: { onboarded: true } })
+    await completeOnboarding()
     toast('设置完成')
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
     router.replace(redirect || '/')
