@@ -97,6 +97,19 @@ npm run dev:local
 ssh -i D:\Edge\donglemei_new -N -L 13306:127.0.0.1:3306 ubuntu@3.105.101.123
 ```
 
+## Spring Boot 后端（迁移中）
+
+`backend-spring/` 是 Spring Boot 3.5 + Java 21 的迁移版本，目前只完成骨架，线上仍由 Node 提供服务。
+
+```bash
+cd backend-spring
+mvn -DskipTests package
+JWT_SECRET=你的密钥 DB_HOST=127.0.0.1 DB_PORT=13306 DB_USER=dlm DB_PASSWORD=你的密码 \
+  java -jar target/dongleme-backend.jar
+```
+
+默认监听 `8080`，接口路径保持 `/api/*`，数据库沿用 `donglemei`。
+
 ## 数据库结构
 
 [`mysql/schema.sql`](./mysql/schema.sql) 包含：
