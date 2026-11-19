@@ -103,7 +103,10 @@ const server = http.createServer((req, res) => {
       try {
         const result = await getHandler(name)(event, {})
         res.writeHead(result.statusCode || 200, result.headers || {})
-        res.end(result.body || '')
+        const body = result.isBase64Encoded
+          ? Buffer.from(result.body || '', 'base64')
+          : result.body || ''
+        res.end(body)
       } catch (error) {
         console.error(`[${name}]`, error)
         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' })
