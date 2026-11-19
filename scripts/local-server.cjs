@@ -1,9 +1,9 @@
 /**
- * 本地全栈启动器（Netlify Dev 的替代方案）
+ * 本地全栈启动器
  *
  * - 加载项目根目录的 .env
  * - 托管 dist 静态文件（SPA fallback）
- * - 直接在 Node 进程里调用 netlify/functions/*.js
+ * - 直接在 Node 进程里调用 server/*.js
  *
  * 用法：
  *   npm run dev:local    # 先 build，再启动
@@ -35,7 +35,7 @@ const allowed = new Set(['profile', 'checkin', 'stats', 'rank', 'summary', 'admi
 
 function getHandler(name) {
   if (!handlers[name]) {
-    handlers[name] = require(path.join(PROJECT, 'netlify/functions', `${name}.js`)).handler
+    handlers[name] = require(path.join(PROJECT, 'server', `${name}.js`)).handler
   }
   return handlers[name]
 }
@@ -70,8 +70,8 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost')
   const pathname = decodeURIComponent(url.pathname)
 
-  if (pathname.startsWith('/.netlify/functions/')) {
-    const rest = pathname.slice('/.netlify/functions/'.length)
+  if (pathname.startsWith('/api/')) {
+    const rest = pathname.slice('/api/'.length)
     const name = rest.split('/')[0]
     if (!allowed.has(name)) {
       res.writeHead(404)
@@ -140,5 +140,5 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`\n  动了么 · 本地全栈已启动`)
   console.log(`  http://127.0.0.1:${PORT}/\n`)
   console.log('  前端：dist 构建产物')
-  console.log('  接口：/.netlify/functions/*（MySQL）\n')
+  console.log('  接口：/api/*（MySQL）\n')
 })

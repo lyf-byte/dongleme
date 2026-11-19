@@ -2,12 +2,12 @@ import axios from 'axios'
 import { getToken, getAdminToken, signOut, adminSignOut } from './auth'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE || '/.netlify/functions',
+  baseURL: import.meta.env.VITE_API_BASE || '/api',
   timeout: 20000
 })
 
 const adminApi = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE || '/.netlify/functions',
+  baseURL: import.meta.env.VITE_API_BASE || '/api',
   timeout: 20000
 })
 

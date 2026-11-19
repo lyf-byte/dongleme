@@ -12,7 +12,7 @@
 ## 技术栈
 
 - 前端：Vue 3 + Vite + Vue Router + ECharts + Lucide 图标，手写设计系统
-- 后端：Node.js HTTP 服务，复用 `netlify/functions/` 下的 Handler
+- 后端：Node.js HTTP 服务，复用 `server/` 下的 Handler
 - 数据库：MySQL 8（安装在 EC2 本机，仅监听 127.0.0.1）
 - 登录：自建 JWT + bcrypt 密码哈希
 - 部署：AWS EC2 + Caddy（自动 HTTPS）+ systemd
@@ -186,7 +186,7 @@ mysqldump -u dlm -p donglemei > /opt/donglemei/backup-$(date +%F).sql
 │   ├── styles/
 │   ├── App.vue
 │   └── main.js
-├── netlify/functions/    # API Handler：db.js / auth.js / checkin.js / stats.js / rank.js / summary.js / profile.js / admin.js
+├── server/               # API Handler：db.js / auth.js / checkin.js / stats.js / rank.js / summary.js / profile.js / admin.js
 ├── scripts/
 │   ├── local-server.cjs  # Node HTTP 服务：托管 dist 并调用 Handler
 │   └── migrate-supabase-to-mysql.mjs
