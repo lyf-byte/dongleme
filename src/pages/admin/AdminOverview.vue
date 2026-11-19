@@ -1,7 +1,8 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import { RefreshCw } from 'lucide-vue-next'
+import { ClipboardList, Clock3, Flame, RefreshCw, Users } from 'lucide-vue-next'
 import { adminOverview, errorMessage } from '../../utils/api'
+import { sportTagClass } from '../../utils/sport'
 
 const data = ref(null)
 const loading = ref(true)
@@ -41,18 +42,22 @@ onMounted(load)
 
     <div class="admin-metrics">
       <div class="admin-metric">
+        <span class="admin-metric__icon admin-metric__icon--blue"><Users :size="18" /></span>
         <span>总用户</span>
         <strong>{{ data?.totalUsers ?? '—' }}</strong>
       </div>
       <div class="admin-metric">
+        <span class="admin-metric__icon admin-metric__icon--green"><ClipboardList :size="18" /></span>
         <span>总打卡</span>
         <strong>{{ data?.totalRecords ?? '—' }}</strong>
       </div>
       <div class="admin-metric">
+        <span class="admin-metric__icon admin-metric__icon--orange"><Flame :size="18" /></span>
         <span>今日活跃</span>
         <strong>{{ data?.activeToday ?? '—' }}</strong>
       </div>
       <div class="admin-metric">
+        <span class="admin-metric__icon admin-metric__icon--violet"><Clock3 :size="18" /></span>
         <span>本周时长 / 分钟</span>
         <strong>{{ data?.weekMinutes ?? '—' }}</strong>
       </div>
@@ -81,7 +86,7 @@ onMounted(load)
             <tr v-for="row in data.recent" :key="row.id">
               <td class="num">{{ row.date }}</td>
               <td>{{ row.nickname }}</td>
-              <td>{{ row.type }}</td>
+              <td><span :class="sportTagClass(row.type)">{{ row.type }}</span></td>
               <td class="num">{{ row.duration }} 分钟</td>
               <td class="num">{{ row.calories }} 千卡</td>
             </tr>

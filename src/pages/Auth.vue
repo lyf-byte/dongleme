@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowRight, Eye, EyeOff, Lock, ShieldCheck, UserRound } from 'lucide-vue-next'
 import { supabase, isConfigured } from '../utils/supabase'
+import authHero from '../assets/auth-hero.svg'
 
 const route = useRoute()
 const router = useRouter()
@@ -136,11 +137,14 @@ async function onSubmit() {
 <template>
   <div class="auth">
     <header class="auth-hero">
-      <span class="auth-orb auth-orb--a"></span>
-      <span class="auth-orb auth-orb--b"></span>
-      <div class="auth-logo">动</div>
-      <h1>动了没</h1>
-      <p>每天动一点，连续看得见</p>
+      <div class="auth-brand">
+        <img class="auth-logo" src="/logo.svg" alt="动了没" />
+        <div>
+          <h1>动了没</h1>
+          <p>每天动一点，连续看得见</p>
+        </div>
+      </div>
+      <img class="auth-illustration" :src="authHero" alt="" aria-hidden="true" />
       <div class="auth-tags">
         <span class="chip chip--blue">连续打卡</span>
         <span class="chip chip--yellow">校园排行</span>
@@ -246,73 +250,53 @@ async function onSubmit() {
 .auth {
   min-height: 100vh;
   padding: 0 20px calc(28px + env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, #eaf1ff 0%, #f2f4f8 46%);
+  background: var(--bg);
   overflow: hidden;
 }
 
 .auth-hero {
-  position: relative;
-  padding: 56px 4px 26px;
+  padding: 40px 4px 20px;
 }
 
-.auth-orb {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.auth-orb--a {
-  width: 190px;
-  height: 190px;
-  right: -70px;
-  top: -50px;
-  background: rgba(47, 107, 255, 0.1);
-}
-
-.auth-orb--b {
-  width: 90px;
-  height: 90px;
-  right: 44px;
-  top: 120px;
-  background: rgba(246, 178, 27, 0.16);
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .auth-logo {
-  position: relative;
-  width: 56px;
-  height: 56px;
-  display: grid;
-  place-items: center;
-  border-radius: 18px;
-  background: var(--blue);
-  color: #fff;
-  font-size: 26px;
-  font-weight: 700;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  border-radius: 16px;
   box-shadow: 0 10px 24px rgba(47, 107, 255, 0.28);
 }
 
+.auth-illustration {
+  display: block;
+  width: 100%;
+  margin: 20px 0 4px;
+}
+
 .auth-hero h1 {
-  position: relative;
-  margin: 16px 0 6px;
-  font-size: 32px;
-  line-height: 38px;
+  margin: 0;
+  font-size: 28px;
+  line-height: 34px;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
 .auth-hero p {
-  position: relative;
-  margin: 0;
-  font-size: 14px;
+  margin: 2px 0 0;
+  font-size: 13px;
   color: var(--text-2);
 }
 
 .auth-tags {
-  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .auth-card {

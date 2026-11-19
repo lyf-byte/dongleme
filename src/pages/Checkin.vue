@@ -63,7 +63,6 @@ async function submit(overwrite = false) {
     setTimeout(() => router.replace('/'), 500)
   } catch (error) {
     if (error?.response?.status === 409 && !overwrite) {
-      submitting.value = false
       try {
         await confirmDialog({
           title: '今日已打卡',
@@ -96,7 +95,7 @@ onMounted(loadProfile)
     </header>
 
     <section class="selected-card">
-      <span class="selected-icon">{{ currentSport.name.slice(0, 1) }}</span>
+      <span class="selected-icon"><component :is="currentSport.icon" :size="22" /></span>
       <div class="selected-main">
         <h2>{{ form.type }}</h2>
         <span>MET {{ met.toFixed(1) }} · 自动估算</span>
@@ -121,7 +120,7 @@ onMounted(loadProfile)
         @click="form.type = sport.name"
       >
         <span class="type-icon" :class="'type-icon--' + index">
-          {{ sport.name.slice(0, 1) }}
+          <component :is="sport.icon" :size="16" />
         </span>
         <span class="type-name">{{ sport.name }}</span>
         <span class="type-met">MET {{ sport.met.toFixed(1) }}</span>

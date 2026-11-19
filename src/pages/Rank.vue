@@ -1,8 +1,9 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Trophy } from 'lucide-vue-next'
+import { Crown, Trophy } from 'lucide-vue-next'
 import { getRank, errorMessage } from '../utils/api'
 import { toast } from '../utils/ui'
+import emptyRank from '../assets/empty-rank.svg'
 
 const loading = ref(true)
 const data = ref({ list: [], me: null })
@@ -81,6 +82,7 @@ onMounted(load)
             {{ item.nickname.slice(0, 1) }}
           </span>
           <span class="rank-name">
+            <Crown v-if="index === 0" :size="13" class="rank-crown" />
             {{ item.nickname }}
             <em v-if="item.isMe">我</em>
           </span>
@@ -89,7 +91,7 @@ onMounted(load)
       </div>
 
       <div v-else class="card empty-state">
-        <span class="empty-state__icon"><Trophy :size="24" /></span>
+        <img class="empty-state__art" :src="emptyRank" alt="" aria-hidden="true" />
         <h3>本周还没有人打卡</h3>
         <p>你可以成为第一个上榜的人。</p>
       </div>
@@ -256,6 +258,16 @@ onMounted(load)
   white-space: nowrap;
   font-size: 14px;
   font-weight: 500;
+}
+
+.rank-row:nth-child(-n + 3) .rank-name {
+  font-weight: 600;
+}
+
+.rank-crown {
+  margin-right: 3px;
+  color: #b45309;
+  vertical-align: -2px;
 }
 
 .rank-name em {

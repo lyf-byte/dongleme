@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { Copy, RefreshCw, Sparkles } from 'lucide-vue-next'
 import { generateSummary, errorMessage } from '../utils/api'
 import { toast } from '../utils/ui'
+import emptySummary from '../assets/empty-summary.svg'
 
 const loading = ref(true)
 const generating = ref(false)
@@ -118,7 +119,7 @@ onMounted(peek)
       </section>
 
       <div v-else class="card empty-state report-empty">
-        <span class="empty-state__icon"><Sparkles :size="24" /></span>
+        <img class="empty-state__art" :src="emptySummary" alt="" aria-hidden="true" />
         <h3>还没有本周小结</h3>
         <p>汇总你本周的打卡数据，生成一段专属的教练建议。</p>
         <button
@@ -213,7 +214,7 @@ onMounted(peek)
 }
 
 .report-empty .btn-primary {
-  margin-top: 16px;
+  margin: 16px auto 0;
 }
 
 .foot {

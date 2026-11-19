@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { RefreshCw, Trash2 } from 'lucide-vue-next'
 import { adminRecords, adminDeleteRecord, errorMessage } from '../../utils/api'
-import { SPORTS } from '../../utils/sport'
+import { SPORTS, sportTagClass } from '../../utils/sport'
 import { confirmDialog, toast } from '../../utils/ui'
 
 const records = ref([])
@@ -101,7 +101,7 @@ onMounted(load)
             <tr v-for="row in records" :key="row.id">
               <td class="num">{{ row.date }}</td>
               <td>{{ row.nickname }}</td>
-              <td>{{ row.type }}</td>
+              <td><span :class="sportTagClass(row.type)">{{ row.type }}</span></td>
               <td class="num">{{ row.duration }} 分钟</td>
               <td class="num">{{ row.calories }} 千卡</td>
               <td>

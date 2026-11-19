@@ -87,10 +87,12 @@ exports.handler = async (event) => {
     const todayTotals = sumRows(allRows.filter((row) => row.date === today))
     const weekTotals = sumRows(allRows.filter((row) => row.date >= weekStart))
     const totalTotals = sumRows(allRows)
+    const weekDays = [...new Set(allRows.filter((row) => row.date >= weekStart).map((row) => row.date))]
 
     return json(200, {
       ...mapProfile(profileRow),
       weekMinutes: weekTotals.minutes,
+      weekDays,
       today: { minutes: todayTotals.minutes, calories: todayTotals.calories },
       total: totalTotals
     })

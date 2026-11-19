@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { RefreshCw, Search, Trash2 } from 'lucide-vue-next'
 import { adminUsers, adminDeleteUser, errorMessage } from '../../utils/api'
-import { getSession } from '../../utils/supabase'
+import { getAdminSession } from '../../utils/supabase'
 import { confirmDialog, toast } from '../../utils/ui'
 
 const users = ref([])
@@ -56,7 +56,7 @@ function formatDate(value) {
 }
 
 onMounted(async () => {
-  const { data } = await getSession()
+  const { data } = await getAdminSession()
   currentUserId.value = data.session?.user?.id || ''
   await load()
 })

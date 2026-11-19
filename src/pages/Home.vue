@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Clock3, Flame, Plus, RefreshCw } from 'lucide-vue-next'
+import { ArrowRight, Check, Clock3, Flame, Plus, RefreshCw } from 'lucide-vue-next'
 import { getProfile } from '../utils/api'
 import { SPORTS } from '../utils/sport'
 
@@ -22,6 +22,17 @@ const dateText = new Intl.DateTimeFormat('zh-CN', {
 
 const weekDays = ['一', '二', '三', '四', '五', '六', '日']
 const todayIndex = (new Date(`${todayStr}T00:00:00Z`).getUTCDay() + 6) % 7
+
+const weekDates = computed(() => {
+  const monday = new Date(`${todayStr}T00:00:00Z`)
+  monday.setUTCDate(monday.getUTCDate() - todayIndex)
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday)
+    d.setUTCDate(d.getUTCDate() + i)
+    return d.toISOString().slice(0, 10)
+  })
+})
+const checkedDays = computed(() => new Set(profile.value?.weekDays || []))
 
 const greet = computed(() => {
   const hour = new Date().getHours()
@@ -88,7 +99,17 @@ onMounted(load)
 
     <template v-else-if="profile">
       <section class="streak-card">
-        <span class="streak-orb"></span>
+        <svg class="streak-mark" viewBox="0 0 64 64" aria-hidden="true">
+          <path
+            d="M13 40H24L32 47.5L46 28"
+            fill="none"
+            stroke="rgba(255,255,255,0.14)"
+            stroke-width="6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <circle cx="48.5" cy="21.5" r="5.5" fill="rgba(246,178,27,0.9)" />
+        </svg>
         <div class="streak-top">
           <span class="streak-label">
             <Flame :size="16" />
@@ -111,9 +132,13 @@ onMounted(load)
             v-for="(day, index) in weekDays"
             :key="day"
             class="week-strip__day"
-            :class="{ active: index === todayIndex }"
+            :class="{
+              done: checkedDays.has(weekDates[index]),
+              today: index === todayIndex
+            }"
           >
-            {{ day }}
+            <Check v-if="checkedDays.has(weekDates[index])" :size="13" />
+            <template v-else>{{ day }}</template>
           </div>
         </div>
       </section>
@@ -154,7 +179,7 @@ onMounted(load)
           @click="goCheckin(sport.name)"
         >
           <span class="sport-icon" :class="'sport-icon--' + index">
-            {{ sport.name.slice(0, 1) }}
+            <component :is="sport.icon" :size="20" />
           </span>
           <span class="sport-name">{{ sport.name }}</span>
           <span class="sport-met">MET {{ sport.met.toFixed(1) }}</span>
@@ -197,14 +222,12 @@ onMounted(load)
   box-shadow: 0 14px 30px rgba(47, 107, 255, 0.25);
 }
 
-.streak-orb {
+.streak-mark {
   position: absolute;
-  width: 180px;
-  height: 180px;
-  right: -54px;
-  top: -74px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
+  width: 150px;
+  height: 150px;
+  right: -26px;
+  top: -30px;
   pointer-events: none;
 }
 
@@ -279,7 +302,19 @@ onMounted(load)
   border-top: 1px solid rgba(255, 255, 255, 0.18);
 }
 
+.week-strip::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 27px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
 .week-strip__day {
+  position: relative;
   width: 28px;
   height: 28px;
   display: grid;
@@ -292,10 +327,22 @@ onMounted(load)
   font-weight: 500;
 }
 
-.week-strip__day.active {
+.week-strip__day.today {
+  background: transparent;
+  border: 2px solid #fff;
+  color: #fff;
+  font-weight: 700;
+}
+
+.week-strip__day.done {
   background: #fff;
   color: var(--blue);
   font-weight: 700;
+}
+
+.week-strip__day.done.today {
+  border: 0;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
 }
 
 .today-grid {

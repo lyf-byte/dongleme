@@ -41,9 +41,13 @@ create table if not exists public.summaries (
   user_id uuid not null references public.users(id) on delete cascade,
   week_start date not null,
   content text not null,
+  regen_count int not null default 0,
   created_at timestamptz not null default now(),
   unique (user_id, week_start)
 );
+
+-- 兼容已建表：重新生成次数计数（每周节流用）
+alter table public.summaries add column if not exists regen_count int not null default 0;
 
 -- 本周排行榜视图：周一起算，按上海时区取当前周
 create or replace view public.weekly_rank as

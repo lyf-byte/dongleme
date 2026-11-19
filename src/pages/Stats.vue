@@ -8,6 +8,7 @@ import { GridComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import { getStats, errorMessage } from '../utils/api'
 import { toast } from '../utils/ui'
+import emptyStats from '../assets/empty-stats.svg'
 
 echarts.use([BarChart, PieChart, GridComponent, TooltipComponent, CanvasRenderer])
 
@@ -29,6 +30,7 @@ const pieEl = ref(null)
 
 let barChart = null
 let pieChart = null
+let loadSeq = 0
 
 const total = computed(() => data.value.total || { count: 0, minutes: 0, calories: 0 })
 const hasData = computed(() => total.value.count > 0)
@@ -135,14 +137,20 @@ function renderCharts() {
 }
 
 async function load() {
+  const seq = ++loadSeq
   loading.value = true
   try {
-    data.value = await getStats(range.value)
+    const result = await getStats(range.value)
+    if (seq !== loadSeq) return
+    data.value = result
     loading.value = false
     disposeCharts()
     await nextTick()
+    if (seq !== loadSeq) return
     renderCharts()
   } catch (error) {
+    if (seq !== loadSeq) return
+    disposeCharts()
     toast(errorMessage(error, '加载统计失败'))
     data.value = { daily: [], types: {}, total: { count: 0, minutes: 0, calories: 0 } }
     loading.value = false
@@ -160,6 +168,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  loadSeq++
   window.removeEventListener('resize', onResize)
   disposeCharts()
 })
@@ -242,7 +251,7 @@ onUnmounted(() => {
     </template>
 
     <div v-else class="card empty-state">
-      <span class="empty-state__icon"><ChartBar :size="24" /></span>
+      <img class="empty-state__art" :src="emptyStats" alt="" aria-hidden="true" />
       <h3>这段时间还没有记录</h3>
       <p>去完成一次运动，数据就会出现在这里。</p>
       <button type="button" class="btn-primary btn-sm empty-btn" @click="router.push('/checkin')">

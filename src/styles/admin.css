@@ -21,11 +21,21 @@
 }
 
 .admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 4px 10px 18px;
   font-size: 20px;
   line-height: 24px;
   font-weight: 700;
   letter-spacing: -0.02em;
+}
+
+.admin-brand__logo {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border-radius: 11px;
 }
 
 .admin-brand span {
@@ -187,6 +197,35 @@
   background: var(--surface);
 }
 
+.admin-metric__icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 10px;
+  border-radius: 11px;
+}
+
+.admin-metric__icon--blue {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.admin-metric__icon--green {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.admin-metric__icon--orange {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
+.admin-metric__icon--violet {
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+
 .admin-metric span {
   font-size: 12px;
   color: var(--muted);
@@ -306,6 +345,26 @@
   color: #9a6700;
 }
 
+.admin-tag--green {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.admin-tag--cyan {
+  background: var(--cyan-soft);
+  color: var(--cyan);
+}
+
+.admin-tag--violet {
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+
+.admin-tag--orange {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
 .admin-empty {
   padding: 36px 16px;
   color: var(--muted);
@@ -338,7 +397,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: linear-gradient(180deg, #eaf1ff 0%, #f2f4f8 55%);
+  background: var(--bg);
   overflow-y: auto;
 }
 
@@ -355,11 +414,7 @@
 .admin-login__logo {
   width: 48px;
   height: 48px;
-  display: grid;
-  place-items: center;
   border-radius: 14px;
-  background: var(--blue);
-  color: #fff;
   box-shadow: 0 10px 24px rgba(47, 107, 255, 0.26);
 }
 
@@ -410,6 +465,12 @@
     padding: 0 8px 0 0;
     white-space: nowrap;
     font-size: 16px;
+  }
+
+  .admin-brand__logo {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
   }
 
   .admin-brand span {

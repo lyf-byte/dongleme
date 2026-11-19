@@ -8,6 +8,8 @@ const {
   getWeekStart
 } = require('./db')
 
+const MAX_REGEN_PER_WEEK = 5
+
 const buildFallback = ({ count, minutes, calories }) =>
   `本周你完成了 ${count} 次打卡，累计 ${minutes} 分钟，约消耗 ${calories} 千卡。` +
   (minutes >= 150
@@ -30,7 +32,7 @@ exports.handler = async (event) => {
 
   const { data: cached, error: cacheError } = await supabase
     .from('summaries')
-    .select('content')
+    .select('content, regen_count')
     .eq('user_id', user.id)
     .eq('week_start', weekStart)
     .maybeSingle()
@@ -47,6 +49,12 @@ exports.handler = async (event) => {
 
   if (cached && body.force !== true) {
     return json(200, { weekStart, content: cached.content, cached: true })
+  }
+
+  if (cached && body.force === true && cached.regen_count >= MAX_REGEN_PER_WEEK) {
+    return json(429, {
+      message: `本周重新生成次数已用完（最多 ${MAX_REGEN_PER_WEEK} 次），下周一自动刷新`
+    })
   }
 
   const { data: rows, error } = await supabase
@@ -124,7 +132,12 @@ exports.handler = async (event) => {
     await supabase
       .from('summaries')
       .upsert(
-        { user_id: user.id, week_start: weekStart, content },
+        {
+          user_id: user.id,
+          week_start: weekStart,
+          content,
+          regen_count: cached && body.force === true ? cached.regen_count + 1 : 0
+        },
         { onConflict: 'user_id,week_start' }
       )
 

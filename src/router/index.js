@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { getSession } from '../utils/supabase'
+import { getSession, getAdminSession } from '../utils/supabase'
 
 const routes = [
   {
@@ -60,19 +60,22 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  const { data } = await getSession()
-  const session = data.session
-  const onboarded = session?.user?.user_metadata?.onboarded === true
-  const isAdmin = session?.user?.user_metadata?.is_admin === true
-
   if (to.path.startsWith('/admin')) {
+    const { data } = await getAdminSession()
+    const adminSession = data.session
+    const isAdmin = adminSession?.user?.user_metadata?.is_admin === true
+
     if (to.path === '/admin/login') {
       return isAdmin ? '/admin' : true
     }
-    if (!session) return { path: '/admin/login' }
+    if (!adminSession) return { path: '/admin/login' }
     if (!isAdmin) return { path: '/admin/login', query: { error: 'forbidden' } }
     return true
   }
+
+  const { data } = await getSession()
+  const session = data.session
+  const onboarded = session?.user?.user_metadata?.onboarded === true
 
   if (to.meta.public) {
     if (!session) return true

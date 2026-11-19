@@ -1,8 +1,8 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, Lock, Mail, ShieldCheck } from 'lucide-vue-next'
-import { supabase } from '../../utils/supabase'
+import { ArrowLeft, ArrowRight, Lock, Mail } from 'lucide-vue-next'
+import { adminSupabase, adminSignOut } from '../../utils/supabase'
 import { adminOverview, errorMessage } from '../../utils/api'
 import '../../styles/admin.css'
 
@@ -28,14 +28,14 @@ async function submit() {
 
   loading.value = true
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await adminSupabase.auth.signInWithPassword({
       email: form.value.email.trim(),
       password: form.value.password
     })
     if (error) throw error
 
     if (data.session?.user?.user_metadata?.is_admin !== true) {
-      await supabase.auth.signOut({ scope: 'local' })
+      await adminSignOut()
       errorText.value = '该账号不是管理员'
       return
     }
@@ -44,7 +44,7 @@ async function submit() {
     router.replace('/admin')
   } catch (error) {
     if (error?.response?.status === 403) {
-      await supabase.auth.signOut({ scope: 'local' })
+      await adminSignOut()
       errorText.value = '该账号没有管理员权限'
       return
     }
@@ -58,7 +58,7 @@ async function submit() {
 <template>
   <div class="admin-login">
     <div class="admin-login__card">
-      <div class="admin-login__logo"><ShieldCheck :size="24" /></div>
+      <img class="admin-login__logo" src="/logo.svg" alt="动了没" />
       <h1>后台管理</h1>
       <p>动了没 · 管理员登录</p>
 

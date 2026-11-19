@@ -443,6 +443,7 @@ input[type='number'] {
 }
 
 .tabbar__item {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -455,6 +456,18 @@ input[type='number'] {
 
 .tabbar__item.active {
   color: var(--blue);
+}
+
+.tabbar__item.active::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--blue);
 }
 
 /* ---------- toast & dialog ---------- */
@@ -561,6 +574,13 @@ input[type='number'] {
   border-radius: 20px;
   background: var(--blue-soft);
   color: var(--blue);
+}
+
+.empty-state__art {
+  display: block;
+  width: 170px;
+  max-width: 72%;
+  margin: 0 auto 14px;
 }
 
 .empty-state h3 {

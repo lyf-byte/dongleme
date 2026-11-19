@@ -1,7 +1,12 @@
 import axios from 'axios'
-import { supabase, signOut } from './supabase'
+import { supabase, signOut, adminSupabase, adminSignOut } from './supabase'
 
 const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE || '/.netlify/functions',
+  timeout: 20000
+})
+
+const adminApi = axios.create({
   baseURL: import.meta.env.VITE_API_BASE || '/.netlify/functions',
   timeout: 20000
 })
@@ -41,6 +46,26 @@ api.interceptors.response.use(
       clearApiCache()
       await signOut()
       if (window.location.pathname !== '/auth') window.location.replace('/auth')
+    }
+    return Promise.reject(error)
+  }
+)
+
+adminApi.interceptors.request.use(async (config) => {
+  const { data } = await adminSupabase.auth.getSession()
+  const token = data.session?.access_token
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+adminApi.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      await adminSignOut()
+      if (window.location.pathname.startsWith('/admin')) {
+        window.location.replace('/admin/login')
+      }
     }
     return Promise.reject(error)
   }
@@ -114,22 +139,22 @@ export async function clearRecords() {
 }
 
 export const adminOverview = () =>
-  api.get('/admin', { params: { action: 'overview' } }).then((res) => res.data)
+  adminApi.get('/admin', { params: { action: 'overview' } }).then((res) => res.data)
 
 export const adminUsers = (query = '') =>
-  api.get('/admin', { params: { action: 'users', query } }).then((res) => res.data)
+  adminApi.get('/admin', { params: { action: 'users', query } }).then((res) => res.data)
 
 export const adminRecords = (params = {}) =>
-  api.get('/admin', { params: { action: 'records', ...params } }).then((res) => res.data)
+  adminApi.get('/admin', { params: { action: 'records', ...params } }).then((res) => res.data)
 
 export const adminRank = () =>
-  api.get('/admin', { params: { action: 'rank' } }).then((res) => res.data)
+  adminApi.get('/admin', { params: { action: 'rank' } }).then((res) => res.data)
 
 export const adminDeleteUser = (id) =>
-  api.delete('/admin', { params: { action: 'user', id } }).then((res) => res.data)
+  adminApi.delete('/admin', { params: { action: 'user', id } }).then((res) => res.data)
 
 export const adminDeleteRecord = (id) =>
-  api.delete('/admin', { params: { action: 'record', id } }).then((res) => res.data)
+  adminApi.delete('/admin', { params: { action: 'record', id } }).then((res) => res.data)
 
 export function errorMessage(error, fallback = '操作失败，请稍后再试') {
   return error?.response?.data?.message || error?.message || fallback

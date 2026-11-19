@@ -2,8 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ClipboardList, LayoutDashboard, LogOut, Trophy, Users } from 'lucide-vue-next'
-import { getSession, signOut } from '../../utils/supabase'
-import { clearApiCache } from '../../utils/api'
+import { getAdminSession, adminSignOut } from '../../utils/supabase'
 import { confirmDialog } from '../../utils/ui'
 import '../../styles/admin.css'
 
@@ -34,13 +33,12 @@ async function logout() {
   } catch {
     return
   }
-  clearApiCache()
-  await signOut()
+  await adminSignOut()
   router.replace('/admin/login')
 }
 
 onMounted(async () => {
-  const { data } = await getSession()
+  const { data } = await getAdminSession()
   const user = data.session?.user
   account.value = user?.email || user?.user_metadata?.phone || ''
 })
@@ -50,8 +48,11 @@ onMounted(async () => {
   <div class="admin-shell">
     <aside class="admin-side">
       <div class="admin-brand">
-        动了没
-        <span>ADMIN CONSOLE</span>
+        <img class="admin-brand__logo" src="/logo.svg" alt="" aria-hidden="true" />
+        <div>
+          动了没
+          <span>ADMIN CONSOLE</span>
+        </div>
       </div>
 
       <nav class="admin-nav">

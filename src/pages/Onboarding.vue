@@ -5,6 +5,7 @@ import { ArrowRight } from 'lucide-vue-next'
 import { supabase } from '../utils/supabase'
 import { updateProfile, errorMessage } from '../utils/api'
 import { toast } from '../utils/ui'
+import onboardingArt from '../assets/onboarding.svg'
 
 const route = useRoute()
 const router = useRouter()
@@ -59,6 +60,8 @@ async function submit() {
     </header>
 
     <p class="intro">这些信息用于计算卡路里和每周目标，之后可以在「我的」里修改。</p>
+
+    <img class="onboarding-art" :src="onboardingArt" alt="" aria-hidden="true" />
 
     <div class="card profile-preview">
       <div class="avatar profile-avatar">{{ avatarText }}</div>
@@ -121,6 +124,13 @@ async function submit() {
   font-size: 14px;
   line-height: 22px;
   color: var(--text-2);
+}
+
+.onboarding-art {
+  display: block;
+  width: 100%;
+  max-height: 190px;
+  margin: 0 0 16px;
 }
 
 .profile-preview {
