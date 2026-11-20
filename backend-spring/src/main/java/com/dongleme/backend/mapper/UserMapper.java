@@ -52,7 +52,8 @@ public interface UserMapper extends BaseMapper<User> {
                    u.last_check_date, u.is_admin as admin, u.created_at, u.email, u.phone, u.username,
                    count(r.id) as record_count,
                    coalesce(sum(case when r.date &gt;= #{weekStart} then r.duration else 0 end), 0) as week_minutes,
-                   (select count(*) from activity_routes ar where ar.user_id = u.id) as route_count
+                   (select count(*) from activity_routes ar where ar.user_id = u.id) as route_count,
+                   count(*) over() as total
             from users u
             left join records r on r.user_id = u.id
             <where>

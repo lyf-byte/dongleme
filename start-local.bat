@@ -81,6 +81,7 @@ if errorlevel 1 (
 echo.
 echo ============================================
 echo   frontend  http://127.0.0.1:5173
+echo   admin     http://127.0.0.1:5173/admin
 echo   backend   http://127.0.0.1:8080/api/health
 echo   logs      .run\backend.log / .run\frontend.log
 echo   stop      stop-local.bat

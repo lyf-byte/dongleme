@@ -13,15 +13,31 @@ const loading = ref(true)
 const errorText = ref('')
 const scope = ref('week')
 
-const topList = computed(() => list.value.slice(0, 3))
+const podiumList = computed(() => {
+  const top = list.value.slice(0, 3)
+  if (top.length >= 3) {
+    return [
+      { item: top[1], rank: 1 },
+      { item: top[0], rank: 0 },
+      { item: top[2], rank: 2 }
+    ]
+  }
+  if (top.length === 2) {
+    return [
+      { item: top[1], rank: 1 },
+      { item: top[0], rank: 0 }
+    ]
+  }
+  return top.map((item) => ({ item, rank: 0 }))
+})
 const barList = computed(() => list.value.slice(0, 10))
 const maxMinutes = computed(() => barList.value[0]?.weeklyMinutes || 1)
 
-async function load() {
+async function load(force = false) {
   loading.value = true
   errorText.value = ''
   try {
-    const data = await adminRank(scope.value)
+    const data = await adminRank(scope.value, force)
     list.value = data.list || []
   } catch (error) {
     errorText.value = errorMessage(error, '加载排行榜失败')
@@ -51,7 +67,7 @@ onMounted(load)
         <p>{{ scope === 'week' ? '按本周累计运动时长排序' : '按历史累计运动时长排序' }}</p>
       </div>
       <div class="admin-actions">
-        <button type="button" class="admin-btn" :disabled="loading" @click="load">
+        <button type="button" class="admin-btn" :disabled="loading" @click="load(true)">
           <RefreshCw :size="15" />
           刷新
         </button>
@@ -82,15 +98,15 @@ onMounted(load)
     <template v-else-if="list.length">
       <div class="admin-podium">
         <div
-          v-for="(item, index) in topList"
-          :key="item.id"
+          v-for="entry in podiumList"
+          :key="entry.item.id"
           class="admin-podium__item"
-          :class="`admin-podium__item--${medalClass(index)}`"
+          :class="`admin-podium__item--${medalClass(entry.rank)}`"
         >
-          <span class="admin-podium__medal">{{ index + 1 }}</span>
-          <span class="admin-podium__name">{{ item.nickname }}</span>
+          <span class="admin-podium__medal">{{ entry.rank + 1 }}</span>
+          <span class="admin-podium__name">{{ entry.item.nickname }}</span>
           <span class="admin-podium__minutes">
-            <strong>{{ item.weeklyMinutes }}</strong> 分钟
+            <strong>{{ entry.item.weeklyMinutes }}</strong> 分钟
           </span>
         </div>
       </div>

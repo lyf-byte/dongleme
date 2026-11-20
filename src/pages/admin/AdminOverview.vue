@@ -62,16 +62,18 @@ function renderCharts() {
         data: trend.map((item) => item.date.slice(5).replace('-', '/')),
         axisTick: { show: false },
         axisLine: { lineStyle: { color: '#e5eaf2' } },
-        axisLabel: { fontSize: 10, color: '#7c889c', interval: 1 }
+        axisLabel: { fontSize: 10, color: '#7c889c', hideOverlap: true }
       },
       yAxis: [
         {
           type: 'value',
+          minInterval: 1,
           splitLine: { lineStyle: { color: '#f1f4f9', type: 'dashed' } },
           axisLabel: { fontSize: 10, color: '#7c889c' }
         },
         {
           type: 'value',
+          minInterval: 1,
           splitLine: { show: false },
           axisLabel: { fontSize: 10, color: '#7c889c' }
         }
@@ -125,11 +127,11 @@ function renderCharts() {
   }
 }
 
-async function load() {
+async function load(force = false) {
   loading.value = true
   errorText.value = ''
   try {
-    data.value = await adminOverview()
+    data.value = await adminOverview(force)
     loading.value = false
     disposeCharts()
     await nextTick()
@@ -164,7 +166,7 @@ onUnmounted(() => {
         <p>用户、打卡、轨迹与本周活跃情况</p>
       </div>
       <div class="admin-actions">
-        <button type="button" class="admin-btn" :disabled="loading" @click="load">
+        <button type="button" class="admin-btn" :disabled="loading" @click="load(true)">
           <RefreshCw :size="15" />
           刷新
         </button>

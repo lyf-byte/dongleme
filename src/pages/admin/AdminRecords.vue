@@ -32,7 +32,7 @@ const allChecked = computed(
   () => records.value.length > 0 && records.value.every((row) => selectedIds.value.includes(row.id))
 )
 
-async function load() {
+async function load(force = false) {
   loading.value = true
   errorText.value = ''
   try {
@@ -43,7 +43,7 @@ async function load() {
       to: filters.value.to,
       page: page.value,
       pageSize
-    })
+    }, force)
     records.value = data.records || []
     total.value = data.total || 0
     page.value = data.page || page.value
@@ -181,7 +181,7 @@ onMounted(() => {
           <Download :size="15" />
           导出 CSV
         </button>
-        <button type="button" class="admin-btn" :disabled="loading" @click="load">
+        <button type="button" class="admin-btn" :disabled="loading" @click="load(true)">
           <RefreshCw :size="15" />
           刷新
         </button>
@@ -246,11 +246,11 @@ onMounted(() => {
               <th style="width: 40px">
                 <input type="checkbox" :checked="allChecked" @change="toggleAll" />
               </th>
-              <th>日期</th>
+              <th class="col-lg">日期</th>
               <th>用户</th>
               <th>类型</th>
               <th>时长</th>
-              <th>卡路里</th>
+              <th class="col-lg">卡路里</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -259,11 +259,14 @@ onMounted(() => {
               <td>
                 <input v-model="selectedIds" type="checkbox" :value="row.id" />
               </td>
-              <td class="num">{{ row.date }}</td>
-              <td>{{ row.nickname }}</td>
+              <td class="num col-lg">{{ row.date }}</td>
+              <td>
+                {{ row.nickname }}
+                <span class="admin-table-sub admin-mobile-only">{{ row.date.slice(5) }}</span>
+              </td>
               <td><span :class="sportTagClass(row.type)">{{ row.type }}</span></td>
               <td class="num">{{ row.duration }} 分钟</td>
-              <td class="num">{{ row.calories }} 千卡</td>
+              <td class="num col-lg">{{ row.calories }} 千卡</td>
               <td>
                 <button
                   type="button"

@@ -1,6 +1,5 @@
 package com.dongleme.backend.service;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.dongleme.backend.common.ApiException;
 import com.dongleme.backend.common.ShanghaiTime;
@@ -8,14 +7,20 @@ import com.dongleme.backend.dto.AdminNewUserRow;
 import com.dongleme.backend.dto.AdminOverviewView;
 import com.dongleme.backend.dto.AdminRankItem;
 import com.dongleme.backend.dto.AdminRankView;
+import com.dongleme.backend.dto.AdminRecentRow;
 import com.dongleme.backend.dto.AdminRecentView;
+import com.dongleme.backend.dto.AdminRecordRow;
 import com.dongleme.backend.dto.AdminRecordView;
 import com.dongleme.backend.dto.AdminRecordsView;
 import com.dongleme.backend.dto.AdminRouteListView;
+import com.dongleme.backend.dto.AdminRouteRow;
 import com.dongleme.backend.dto.AdminRouteView;
+import com.dongleme.backend.dto.AdminSummaryRow;
 import com.dongleme.backend.dto.AdminTrendRow;
+import com.dongleme.backend.dto.AdminTypeStatRow;
 import com.dongleme.backend.dto.AdminUserDetailView;
 import com.dongleme.backend.dto.AdminUserRow;
+import com.dongleme.backend.dto.AdminUserStatsRow;
 import com.dongleme.backend.dto.AdminUsersView;
 import com.dongleme.backend.dto.AdminUserView;
 import com.dongleme.backend.dto.RankRow;
@@ -23,8 +28,10 @@ import com.dongleme.backend.entity.ActivityRoute;
 import com.dongleme.backend.entity.CheckinRecord;
 import com.dongleme.backend.entity.User;
 import com.dongleme.backend.mapper.ActivityRouteMapper;
+import com.dongleme.backend.mapper.AdminStatsMapper;
 import com.dongleme.backend.mapper.CheckinRecordMapper;
 import com.dongleme.backend.mapper.UserMapper;
+import com.dongleme.backend.security.UserLookupCache;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
@@ -32,12 +39,14 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
@@ -48,19 +57,34 @@ public class AdminService {
     private static final Set<String> SORTS =
             Set.of("createdAt", "streak", "records", "weekMinutes", "lastCheck");
 
+    /**
+     * 后台查询专用线程池：数据库在远端，多条查询并行发出可把多次网络往返压缩成一次。
+     */
+    private static final ExecutorService QUERY_POOL = Executors.newFixedThreadPool(8, task -> {
+        Thread thread = new Thread(task, "admin-query");
+        thread.setDaemon(true);
+        return thread;
+    });
+
     private final UserMapper userMapper;
     private final CheckinRecordMapper recordMapper;
     private final ActivityRouteMapper routeMapper;
+    private final AdminStatsMapper adminStatsMapper;
+    private final UserLookupCache userLookupCache;
     private final ObjectMapper objectMapper;
 
     public AdminService(
             UserMapper userMapper,
             CheckinRecordMapper recordMapper,
             ActivityRouteMapper routeMapper,
+            AdminStatsMapper adminStatsMapper,
+            UserLookupCache userLookupCache,
             ObjectMapper objectMapper) {
         this.userMapper = userMapper;
         this.recordMapper = recordMapper;
         this.routeMapper = routeMapper;
+        this.adminStatsMapper = adminStatsMapper;
+        this.userLookupCache = userLookupCache;
         this.objectMapper = objectMapper;
     }
 
@@ -69,18 +93,22 @@ public class AdminService {
         LocalDate weekStart = ShanghaiTime.weekStart(today);
         LocalDate trendFrom = today.minusDays(13);
 
-        long totalUsers = userMapper.selectCount(null);
-        long totalRecords = recordMapper.selectCount(null);
-        long activeToday = recordMapper.countActiveUsers(today);
-        long todayRecords = recordMapper.countByDate(today);
-        long weekMinutes = recordMapper.sumMinutesSince(weekStart);
-        long weekNewUsers = userMapper.countNewUsersSince(weekStart.atStartOfDay());
-        long routeCount = routeMapper.selectCount(null);
+        CompletableFuture<AdminSummaryRow> summaryFuture =
+                async(() -> adminStatsMapper.selectSummary(today, weekStart));
+        CompletableFuture<List<AdminTrendRow>> trendFuture =
+                async(() -> recordMapper.selectTrend(trendFrom));
+        CompletableFuture<List<AdminNewUserRow>> newUserFuture =
+                async(() -> userMapper.selectNewUserTrend(trendFrom));
+        CompletableFuture<List<AdminTypeStatRow>> typeFuture =
+                async(recordMapper::selectTypeStats);
+        CompletableFuture<List<AdminRecentRow>> recentFuture =
+                async(recordMapper::selectRecentRecords);
 
-        Map<LocalDate, AdminTrendRow> recordMap = recordMapper.selectTrend(trendFrom).stream()
+        AdminSummaryRow summary = summaryFuture.join();
+        Map<LocalDate, AdminTrendRow> recordMap = trendFuture.join().stream()
                 .filter(row -> row.getDate() != null)
                 .collect(Collectors.toMap(AdminTrendRow::getDate, row -> row, (a, b) -> a));
-        Map<LocalDate, Long> newUserMap = userMapper.selectNewUserTrend(trendFrom).stream()
+        Map<LocalDate, Long> newUserMap = newUserFuture.join().stream()
                 .filter(row -> row.getDate() != null)
                 .collect(Collectors.toMap(
                         AdminNewUserRow::getDate,
@@ -98,25 +126,25 @@ public class AdminService {
                     newUserMap.getOrDefault(date, 0L)));
         }
 
-        List<AdminOverviewView.TypeStat> types = recordMapper.selectTypeStats().stream()
+        List<AdminOverviewView.TypeStat> types = typeFuture.join().stream()
                 .map(row -> new AdminOverviewView.TypeStat(
                         row.getName(),
                         row.getCount() == null ? 0 : row.getCount(),
                         row.getMinutes() == null ? 0 : row.getMinutes()))
                 .toList();
 
-        List<AdminRecentView> recent = recordMapper.selectRecentRecords().stream()
+        List<AdminRecentView> recent = recentFuture.join().stream()
                 .map(this::toRecentView)
                 .toList();
 
         return new AdminOverviewView(
-                totalUsers,
-                totalRecords,
-                activeToday,
-                weekMinutes,
-                todayRecords,
-                weekNewUsers,
-                routeCount,
+                value(summary == null ? null : summary.getTotalUsers()),
+                value(summary == null ? null : summary.getTotalRecords()),
+                value(summary == null ? null : summary.getActiveToday()),
+                value(summary == null ? null : summary.getWeekMinutes()),
+                value(summary == null ? null : summary.getTodayRecords()),
+                value(summary == null ? null : summary.getWeekNewUsers()),
+                value(summary == null ? null : summary.getRouteCount()),
                 trend,
                 types,
                 recent);
@@ -136,11 +164,21 @@ public class AdminService {
 
         LocalDate today = ShanghaiTime.today();
         LocalDate weekStart = ShanghaiTime.weekStart(today);
-        long total = userMapper.countAdminUsers(query, filter, today);
         int offset = (safePage - 1) * safeSize;
-        List<AdminUserView> users = userMapper
-                .selectAdminUsersPage(query, filter, sort, today, weekStart, safeSize, offset)
-                .stream()
+        List<AdminUserRow> rows = userMapper
+                .selectAdminUsersPage(query, filter, sort, today, weekStart, safeSize, offset);
+
+        long total;
+        if (!rows.isEmpty()) {
+            total = rows.get(0).getTotal() == null ? rows.size() : rows.get(0).getTotal();
+        } else if (safePage == 1) {
+            total = 0;
+        } else {
+            // 最后一页被删空时窗口函数没有行可返回，退回单独计数。
+            total = userMapper.countAdminUsers(query, filter, today);
+        }
+
+        List<AdminUserView> users = rows.stream()
                 .map(this::toUserView)
                 .toList();
 
@@ -148,35 +186,32 @@ public class AdminService {
     }
 
     public AdminUserDetailView userDetail(String id) {
-        User user = userMapper.selectById(id);
-        if (user == null) {
-            throw ApiException.notFound("用户不存在");
-        }
-
         LocalDate weekStart = ShanghaiTime.weekStart(ShanghaiTime.today());
-        long recordCount = recordMapper.selectCount(
-                Wrappers.<CheckinRecord>lambdaQuery().eq(CheckinRecord::getUserId, id));
-        long weekMinutes = recordMapper.selectList(
-                        Wrappers.<CheckinRecord>lambdaQuery()
-                                .eq(CheckinRecord::getUserId, id)
-                                .ge(CheckinRecord::getDate, weekStart))
-                .stream()
-                .mapToLong(row -> row.getDuration() == null ? 0 : row.getDuration())
-                .sum();
-        long routeCount = routeMapper.selectCount(
-                Wrappers.<ActivityRoute>lambdaQuery().eq(ActivityRoute::getUserId, id));
 
-        List<CheckinRecord> records = recordMapper.selectList(
+        CompletableFuture<User> userFuture = async(() -> userMapper.selectById(id));
+        CompletableFuture<AdminUserStatsRow> statsFuture =
+                async(() -> adminStatsMapper.selectUserStats(id, weekStart));
+        CompletableFuture<List<CheckinRecord>> recordFuture = async(() -> recordMapper.selectList(
                 Wrappers.<CheckinRecord>lambdaQuery()
                         .eq(CheckinRecord::getUserId, id)
                         .orderByDesc(CheckinRecord::getDate)
                         .orderByDesc(CheckinRecord::getCreatedAt)
-                        .last("limit 10"));
-        List<ActivityRoute> routes = routeMapper.selectList(
+                        .last("limit 10")));
+        CompletableFuture<List<ActivityRoute>> routeFuture = async(() -> routeMapper.selectList(
                 Wrappers.<ActivityRoute>lambdaQuery()
                         .eq(ActivityRoute::getUserId, id)
                         .orderByDesc(ActivityRoute::getCreatedAt)
-                        .last("limit 5"));
+                        .last("limit 5")));
+
+        User user = userFuture.join();
+        if (user == null) {
+            throw ApiException.notFound("用户不存在");
+        }
+
+        AdminUserStatsRow stats = statsFuture.join();
+        long recordCount = stats == null ? 0 : value(stats.getRecordCount());
+        long weekMinutes = stats == null ? 0 : value(stats.getWeekMinutes());
+        long routeCount = stats == null ? 0 : value(stats.getRouteCount());
 
         AdminUserView view = new AdminUserView(
                 user.getId(),
@@ -193,7 +228,7 @@ public class AdminService {
                 weekMinutes,
                 routeCount);
 
-        List<AdminRecordView> recordViews = records.stream()
+        List<AdminRecordView> recordViews = recordFuture.join().stream()
                 .map(row -> new AdminRecordView(
                         row.getId(),
                         row.getDate(),
@@ -204,7 +239,7 @@ public class AdminService {
                         user.getNickname()))
                 .toList();
 
-        List<AdminRouteView> routeViews = routes.stream()
+        List<AdminRouteView> routeViews = routeFuture.join().stream()
                 .map(row -> toRouteView(row, user.getNickname()))
                 .toList();
 
@@ -220,42 +255,20 @@ public class AdminService {
             int pageSize) {
         int safePage = Math.max(page, 1);
         int safeSize = Math.min(Math.max(pageSize, 1), 100);
-
-        LambdaQueryWrapper<CheckinRecord> wrapper = Wrappers.lambdaQuery();
-        if (type != null && !type.isBlank()) {
-            wrapper.eq(CheckinRecord::getType, type);
-        }
-        if (from != null) {
-            wrapper.ge(CheckinRecord::getDate, from);
-        }
-        if (to != null) {
-            wrapper.le(CheckinRecord::getDate, to);
-        }
-
         String query = queryParam == null ? "" : queryParam.trim();
-        if (!query.isEmpty()) {
-            List<String> userIds = userMapper.selectList(
-                            Wrappers.<User>lambdaQuery()
-                                    .select(User::getId)
-                                    .like(User::getNickname, query))
-                    .stream()
-                    .map(User::getId)
-                    .toList();
-            if (userIds.isEmpty()) {
-                return new AdminRecordsView(List.of(), 0, safePage, safeSize);
-            }
-            wrapper.in(CheckinRecord::getUserId, userIds);
-        }
-
-        long total = recordMapper.selectCount(wrapper);
         int offset = (safePage - 1) * safeSize;
-        wrapper.orderByDesc(CheckinRecord::getDate)
-                .orderByDesc(CheckinRecord::getCreatedAt)
-                .last("limit " + safeSize + " offset " + offset);
 
-        List<CheckinRecord> rows = recordMapper.selectList(wrapper);
-        Map<String, String> nicknames = loadNicknames(
-                rows.stream().map(CheckinRecord::getUserId).collect(Collectors.toSet()));
+        List<AdminRecordRow> rows = adminStatsMapper
+                .selectRecords(query, type, from, to, safeSize, offset);
+
+        long total;
+        if (!rows.isEmpty()) {
+            total = rows.get(0).getTotal() == null ? rows.size() : rows.get(0).getTotal();
+        } else if (safePage == 1) {
+            total = 0;
+        } else {
+            total = adminStatsMapper.countRecords(query, type, from, to);
+        }
 
         List<AdminRecordView> records = rows.stream()
                 .map(row -> new AdminRecordView(
@@ -265,7 +278,7 @@ public class AdminService {
                         row.getDuration() == null ? 0 : row.getDuration(),
                         row.getCalories() == null ? 0 : row.getCalories(),
                         row.getUserId(),
-                        nicknames.getOrDefault(row.getUserId(), "运动新人")))
+                        row.getNickname() == null ? "运动新人" : row.getNickname()))
                 .toList();
 
         return new AdminRecordsView(records, total, safePage, safeSize);
@@ -280,46 +293,25 @@ public class AdminService {
             int pageSize) {
         int safePage = Math.max(page, 1);
         int safeSize = Math.min(Math.max(pageSize, 1), 50);
-
-        LambdaQueryWrapper<ActivityRoute> wrapper = Wrappers.lambdaQuery();
-        if (type != null && !type.isBlank()) {
-            wrapper.eq(ActivityRoute::getType, type);
-        }
-        if (from != null) {
-            wrapper.ge(ActivityRoute::getDate, from);
-        }
-        if (to != null) {
-            wrapper.le(ActivityRoute::getDate, to);
-        }
-
         String query = queryParam == null ? "" : queryParam.trim();
-        if (!query.isEmpty()) {
-            List<String> userIds = userMapper.selectList(
-                            Wrappers.<User>lambdaQuery()
-                                    .select(User::getId)
-                                    .like(User::getNickname, query))
-                    .stream()
-                    .map(User::getId)
-                    .toList();
-            if (userIds.isEmpty()) {
-                return new AdminRouteListView(List.of(), 0, safePage, safeSize);
-            }
-            wrapper.in(ActivityRoute::getUserId, userIds);
-        }
-
-        long total = routeMapper.selectCount(wrapper);
         int offset = (safePage - 1) * safeSize;
-        wrapper.orderByDesc(ActivityRoute::getCreatedAt)
-                .last("limit " + safeSize + " offset " + offset);
 
-        List<ActivityRoute> rows = routeMapper.selectList(wrapper);
-        Map<String, String> nicknames = loadNicknames(
-                rows.stream().map(ActivityRoute::getUserId).collect(Collectors.toSet()));
+        List<AdminRouteRow> rows = adminStatsMapper
+                .selectRoutes(query, type, from, to, safeSize, offset);
+
+        long total;
+        if (!rows.isEmpty()) {
+            total = rows.get(0).getTotal() == null ? rows.size() : rows.get(0).getTotal();
+        } else if (safePage == 1) {
+            total = 0;
+        } else {
+            total = adminStatsMapper.countRoutes(query, type, from, to);
+        }
 
         List<AdminRouteView> views = rows.stream()
                 .map(row -> toRouteView(
                         row,
-                        nicknames.getOrDefault(row.getUserId(), "运动新人")))
+                        row.getNickname() == null ? "运动新人" : row.getNickname()))
                 .toList();
 
         return new AdminRouteListView(views, total, safePage, safeSize);
@@ -367,6 +359,7 @@ public class AdminService {
             if (affected == 0) {
                 throw ApiException.notFound("用户不存在");
             }
+            userLookupCache.invalidate(id);
             return Map.of("ok", true);
         }
 
@@ -415,6 +408,7 @@ public class AdminService {
                     .eq(User::getId, userId)
                     .set(User::getStreak, 0)
                     .set(User::getLastCheckDate, null));
+            userLookupCache.invalidate(userId);
             return;
         }
 
@@ -429,6 +423,7 @@ public class AdminService {
         patch.setStreak(streak);
         patch.setLastCheckDate(latest);
         userMapper.updateById(patch);
+        userLookupCache.invalidate(userId);
     }
 
     private AdminUserView toUserView(AdminUserRow row) {
@@ -448,7 +443,7 @@ public class AdminService {
                 row.getRouteCount() == null ? 0 : row.getRouteCount());
     }
 
-    private AdminRecentView toRecentView(com.dongleme.backend.dto.AdminRecentRow row) {
+    private AdminRecentView toRecentView(AdminRecentRow row) {
         return new AdminRecentView(
                 row.getId(),
                 row.getDate(),
@@ -458,17 +453,22 @@ public class AdminService {
                 row.getNickname());
     }
 
+    private AdminRouteView toRouteView(AdminRouteRow row, String nickname) {
+        return new AdminRouteView(
+                row.getId() == null ? 0 : row.getId(),
+                row.getUserId(),
+                nickname,
+                row.getType(),
+                row.getDate(),
+                row.getDistanceM() == null ? 0 : row.getDistanceM(),
+                row.getDurationSec() == null ? 0 : row.getDurationSec(),
+                row.getCalories() == null ? 0 : row.getCalories(),
+                row.getPointCount() == null ? 0 : row.getPointCount(),
+                row.getCreatedAt(),
+                parsePreview(row.getPreview()));
+    }
+
     private AdminRouteView toRouteView(ActivityRoute route, String nickname) {
-        List<double[]> preview = List.of();
-        if (route.getPreview() != null && !route.getPreview().isBlank()) {
-            try {
-                preview = objectMapper.readValue(
-                        route.getPreview(), new TypeReference<List<double[]>>() {
-                        });
-            } catch (Exception ignored) {
-                preview = List.of();
-            }
-        }
         return new AdminRouteView(
                 route.getId() == null ? 0 : route.getId(),
                 route.getUserId(),
@@ -480,7 +480,19 @@ public class AdminService {
                 route.getCalories() == null ? 0 : route.getCalories(),
                 route.getPointCount() == null ? 0 : route.getPointCount(),
                 route.getCreatedAt(),
-                preview);
+                parsePreview(route.getPreview()));
+    }
+
+    private List<double[]> parsePreview(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(raw, new TypeReference<List<double[]>>() {
+            });
+        } catch (Exception ignored) {
+            return List.of();
+        }
     }
 
     private String accountOf(AdminUserRow row) {
@@ -501,15 +513,11 @@ public class AdminService {
         return phone != null ? phone : "—";
     }
 
-    private Map<String, String> loadNicknames(Collection<String> userIds) {
-        if (userIds.isEmpty()) {
-            return Map.of();
-        }
+    private static long value(Long number) {
+        return number == null ? 0 : number;
+    }
 
-        Map<String, String> nicknames = new HashMap<>();
-        for (User user : userMapper.selectBatchIds(userIds)) {
-            nicknames.put(user.getId(), user.getNickname());
-        }
-        return nicknames;
+    private static <T> CompletableFuture<T> async(Supplier<T> supplier) {
+        return CompletableFuture.supplyAsync(supplier, QUERY_POOL);
     }
 }

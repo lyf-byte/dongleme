@@ -11,6 +11,7 @@ import com.dongleme.backend.entity.User;
 import com.dongleme.backend.mapper.CheckinRecordMapper;
 import com.dongleme.backend.mapper.CustomSportMapper;
 import com.dongleme.backend.mapper.UserMapper;
+import com.dongleme.backend.security.UserLookupCache;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
@@ -26,14 +27,17 @@ public class CheckinService {
     private final UserMapper userMapper;
     private final CheckinRecordMapper recordMapper;
     private final CustomSportMapper customSportMapper;
+    private final UserLookupCache userLookupCache;
 
     public CheckinService(
             UserMapper userMapper,
             CheckinRecordMapper recordMapper,
-            CustomSportMapper customSportMapper) {
+            CustomSportMapper customSportMapper,
+            UserLookupCache userLookupCache) {
         this.userMapper = userMapper;
         this.recordMapper = recordMapper;
         this.customSportMapper = customSportMapper;
+        this.userLookupCache = userLookupCache;
     }
 
     @Transactional
@@ -141,6 +145,7 @@ public class CheckinService {
             patch.setStreak(streak);
             patch.setLastCheckDate(checkinDate);
             userMapper.updateById(patch);
+            userLookupCache.invalidate(userId);
         } catch (DataAccessException exception) {
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "保存打卡记录失败");
         }

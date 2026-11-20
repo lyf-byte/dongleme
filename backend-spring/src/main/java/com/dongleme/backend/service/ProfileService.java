@@ -17,6 +17,7 @@ import com.dongleme.backend.mapper.ActivityRouteMapper;
 import com.dongleme.backend.mapper.CheckinRecordMapper;
 import com.dongleme.backend.mapper.SummaryMapper;
 import com.dongleme.backend.mapper.UserMapper;
+import com.dongleme.backend.security.UserLookupCache;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,18 +42,21 @@ public class ProfileService {
     private final CheckinRecordMapper recordMapper;
     private final SummaryMapper summaryMapper;
     private final ActivityRouteMapper routeMapper;
+    private final UserLookupCache userLookupCache;
 
     public ProfileService(
             AuthService authService,
             UserMapper userMapper,
             CheckinRecordMapper recordMapper,
             SummaryMapper summaryMapper,
-            ActivityRouteMapper routeMapper) {
+            ActivityRouteMapper routeMapper,
+            UserLookupCache userLookupCache) {
         this.authService = authService;
         this.userMapper = userMapper;
         this.recordMapper = recordMapper;
         this.summaryMapper = summaryMapper;
         this.routeMapper = routeMapper;
+        this.userLookupCache = userLookupCache;
     }
 
     public ProfileView getProfile(String userId) {
@@ -170,6 +174,7 @@ public class ProfileService {
         patch.setWeight(BigDecimal.valueOf(weight));
         patch.setWeeklyGoal(weeklyGoal.intValue());
         userMapper.updateById(patch);
+        userLookupCache.invalidate(userId);
 
         Object weightValue = weight % 1 == 0 ? weight.intValue() : weight;
         return Map.of(
@@ -194,6 +199,7 @@ public class ProfileService {
                 .eq(User::getId, userId)
                 .set(User::getStreak, 0)
                 .set(User::getLastCheckDate, null));
+        userLookupCache.invalidate(userId);
 
         return Map.of("ok", true);
     }

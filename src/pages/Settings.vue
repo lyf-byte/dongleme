@@ -28,6 +28,17 @@ const pwdError = ref('')
 const pwdForm = ref({ oldPassword: '', newPassword: '', confirm: '' })
 const docType = ref('')
 
+const adminUrl = computed(() => `${window.location.origin}/admin`)
+
+async function copyAdminUrl() {
+  try {
+    await navigator.clipboard.writeText(adminUrl.value)
+    toast('后台地址已复制')
+  } catch {
+    toast('复制失败，请手动复制')
+  }
+}
+
 const docTitle = computed(() => ({
   terms: '用户协议',
   privacy: '隐私说明',
@@ -315,6 +326,16 @@ async function logout() {
             <strong>动了么</strong>
             <p>校园运动打卡 · 每天动一点，连续看得见</p>
             <p class="about-version">版本 v1.0.0</p>
+
+            <div class="about-admin">
+              <div class="about-admin__info">
+                <span>管理后台</span>
+                <a :href="adminUrl" target="_blank" rel="noopener">{{ adminUrl }}</a>
+              </div>
+              <button type="button" class="about-admin__copy" @click="copyAdminUrl">
+                复制
+              </button>
+            </div>
           </div>
 
           <button type="button" class="btn-primary doc-close" @click="docType = ''">
@@ -534,5 +555,54 @@ async function logout() {
 .about-version {
   color: var(--muted);
   font-size: 11px;
+}
+
+.about-admin {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  text-align: left;
+}
+
+.about-admin__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.about-admin__info span {
+  display: block;
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--muted);
+}
+
+.about-admin__info a {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--blue);
+  font-size: 11px;
+  line-height: 16px;
+  text-decoration: none;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.about-admin__copy {
+  flex: 0 0 auto;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 11px;
+  cursor: pointer;
 }
 </style>

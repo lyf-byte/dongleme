@@ -14,6 +14,25 @@ const adminApi = axios.create({
 const PROFILE_TTL = 30000
 const DATA_TTL = 30000
 const SPORTS_TTL = 30000
+const ADMIN_TTL = 15000
+const ADMIN_TYPES_TTL = 60000
+
+const adminCache = new Map()
+
+export function clearAdminCache() {
+  adminCache.clear()
+}
+
+function adminCached(key, ttl, loader, force = false) {
+  if (!force) {
+    const hit = adminCache.get(key)
+    if (hit && Date.now() - hit.at < ttl) return Promise.resolve(hit.data)
+  }
+  return loader().then((data) => {
+    adminCache.set(key, { data, at: Date.now() })
+    return data
+  })
+}
 
 let profileCache = null
 let profileCacheAt = 0
@@ -65,6 +84,7 @@ adminApi.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      clearAdminCache()
       adminSignOut()
       if (window.location.pathname.startsWith('/admin')) {
         window.location.replace('/admin/login')
@@ -194,35 +214,79 @@ export async function clearRecords() {
   return result
 }
 
-export const adminOverview = () =>
-  adminApi.get('/admin', { params: { action: 'overview' } }).then((res) => res.data)
+export const adminOverview = (force = false) =>
+  adminCached(
+    'overview',
+    ADMIN_TTL,
+    () => adminApi.get('/admin', { params: { action: 'overview' } }).then((res) => res.data),
+    force
+  )
 
-export const adminUsers = (params = {}) =>
-  adminApi.get('/admin', { params: { action: 'users', ...params } }).then((res) => res.data)
+export const adminUsers = (params = {}, force = false) =>
+  adminCached(
+    `users:${JSON.stringify(params)}`,
+    ADMIN_TTL,
+    () => adminApi.get('/admin', { params: { action: 'users', ...params } }).then((res) => res.data),
+    force
+  )
 
-export const adminUserDetail = (id) =>
-  adminApi.get('/admin', { params: { action: 'user', id } }).then((res) => res.data)
+export const adminUserDetail = (id, force = false) =>
+  adminCached(
+    `user:${id}`,
+    ADMIN_TTL,
+    () => adminApi.get('/admin', { params: { action: 'user', id } }).then((res) => res.data),
+    force
+  )
 
-export const adminRecords = (params = {}) =>
-  adminApi.get('/admin', { params: { action: 'records', ...params } }).then((res) => res.data)
+export const adminRecords = (params = {}, force = false) =>
+  adminCached(
+    `records:${JSON.stringify(params)}`,
+    ADMIN_TTL,
+    () => adminApi.get('/admin', { params: { action: 'records', ...params } }).then((res) => res.data),
+    force
+  )
 
-export const adminRoutes = (params = {}) =>
-  adminApi.get('/admin', { params: { action: 'routes', ...params } }).then((res) => res.data)
+export const adminRoutes = (params = {}, force = false) =>
+  adminCached(
+    `routes:${JSON.stringify(params)}`,
+    ADMIN_TTL,
+    () => adminApi.get('/admin', { params: { action: 'routes', ...params } }).then((res) => res.data),
+    force
+  )
 
-export const adminRank = (scope = 'week') =>
-  adminApi.get('/admin', { params: { action: 'rank', scope } }).then((res) => res.data)
+export const adminRank = (scope = 'week', force = false) =>
+  adminCached(
+    `rank:${scope}`,
+    ADMIN_TTL,
+    () => adminApi.get('/admin', { params: { action: 'rank', scope } }).then((res) => res.data),
+    force
+  )
 
-export const adminRecordTypes = () =>
-  adminApi.get('/admin', { params: { action: 'types' } }).then((res) => res.data.types || [])
+export const adminRecordTypes = (force = false) =>
+  adminCached(
+    'types',
+    ADMIN_TYPES_TTL,
+    () => adminApi.get('/admin', { params: { action: 'types' } }).then((res) => res.data.types || []),
+    force
+  )
 
 export const adminDeleteUser = (id) =>
-  adminApi.delete('/admin', { params: { action: 'user', id } }).then((res) => res.data)
+  adminApi.delete('/admin', { params: { action: 'user', id } }).then((res) => {
+    clearAdminCache()
+    return res.data
+  })
 
 export const adminDeleteRecord = (id) =>
-  adminApi.delete('/admin', { params: { action: 'record', id } }).then((res) => res.data)
+  adminApi.delete('/admin', { params: { action: 'record', id } }).then((res) => {
+    clearAdminCache()
+    return res.data
+  })
 
 export const adminDeleteRoute = (id) =>
-  adminApi.delete('/admin', { params: { action: 'route', id } }).then((res) => res.data)
+  adminApi.delete('/admin', { params: { action: 'route', id } }).then((res) => {
+    clearAdminCache()
+    return res.data
+  })
 
 export function errorMessage(error, fallback = '操作失败，请稍后再试') {
   return error?.response?.data?.message || error?.message || fallback

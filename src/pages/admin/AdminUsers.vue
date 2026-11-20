@@ -44,7 +44,7 @@ const detail = ref(null)
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 
-async function load() {
+async function load(force = false) {
   loading.value = true
   errorText.value = ''
   try {
@@ -54,7 +54,7 @@ async function load() {
       sort: sort.value,
       page: page.value,
       pageSize
-    })
+    }, force)
     users.value = data.users || []
     total.value = data.total || 0
     page.value = data.page || page.value
@@ -164,7 +164,7 @@ onMounted(async () => {
         <p>共 {{ total }} 个用户，可按活跃度和数据量筛选</p>
       </div>
       <div class="admin-actions">
-        <button type="button" class="admin-btn" :disabled="loading" @click="load">
+        <button type="button" class="admin-btn" :disabled="loading" @click="load(true)">
           <RefreshCw :size="15" />
           刷新
         </button>
@@ -223,12 +223,12 @@ onMounted(async () => {
           <thead>
             <tr>
               <th>用户</th>
-              <th>连续打卡</th>
+              <th class="col-md">连续打卡</th>
               <th>总打卡</th>
-              <th>本周时长</th>
-              <th>轨迹</th>
-              <th>最后打卡</th>
-              <th>注册时间</th>
+              <th class="col-md">本周时长</th>
+              <th class="col-lg">轨迹</th>
+              <th class="col-lg">最后打卡</th>
+              <th class="col-lg">注册时间</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -249,12 +249,12 @@ onMounted(async () => {
                   </div>
                 </div>
               </td>
-              <td class="num">{{ user.streak }} 天</td>
+              <td class="num col-md">{{ user.streak }} 天</td>
               <td class="num">{{ user.recordCount }} 次</td>
-              <td class="num">{{ user.weekMinutes }} 分钟</td>
-              <td class="num">{{ user.routeCount }} 条</td>
-              <td class="num">{{ formatDate(user.lastCheckDate) }}</td>
-              <td class="num">{{ formatDate(user.createdAt) }}</td>
+              <td class="num col-md">{{ user.weekMinutes }} 分钟</td>
+              <td class="num col-lg">{{ user.routeCount }} 条</td>
+              <td class="num col-lg">{{ formatDate(user.lastCheckDate) }}</td>
+              <td class="num col-lg">{{ formatDate(user.createdAt) }}</td>
               <td>
                 <div class="admin-table-actions">
                   <button type="button" class="admin-btn admin-btn--sm" @click="openDetail(user)">

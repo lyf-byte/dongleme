@@ -21,7 +21,7 @@ const pageDistance = computed(() =>
   routes.value.reduce((sum, row) => sum + (Number(row.distanceM) || 0), 0)
 )
 
-async function load() {
+async function load(force = false) {
   loading.value = true
   errorText.value = ''
   try {
@@ -32,7 +32,7 @@ async function load() {
       to: filters.value.to,
       page: page.value,
       pageSize
-    })
+    }, force)
     routes.value = data.routes || []
     total.value = data.total || 0
     page.value = data.page || page.value
@@ -116,7 +116,7 @@ onMounted(() => {
         <p>共 {{ total }} 条 GPS 轨迹，可按用户、类型和日期筛选</p>
       </div>
       <div class="admin-actions">
-        <button type="button" class="admin-btn" :disabled="loading" @click="load">
+        <button type="button" class="admin-btn" :disabled="loading" @click="load(true)">
           <RefreshCw :size="15" />
           刷新
         </button>
@@ -169,10 +169,10 @@ onMounted(() => {
               <th>轨迹</th>
               <th>用户</th>
               <th>类型</th>
-              <th>日期</th>
+              <th class="col-lg">日期</th>
               <th>距离</th>
               <th>时长</th>
-              <th>轨迹点</th>
+              <th class="col-lg">轨迹点</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -188,10 +188,10 @@ onMounted(() => {
                 <span class="admin-table-sub">{{ formatDateTime(row.createdAt) }}</span>
               </td>
               <td><span :class="sportTagClass(row.type)">{{ row.type }}</span></td>
-              <td class="num">{{ row.date }}</td>
+              <td class="num col-lg">{{ row.date }}</td>
               <td class="num">{{ formatDistance(row.distanceM) }}</td>
               <td class="num">{{ Math.round(row.durationSec / 60) }} 分钟</td>
-              <td class="num">{{ row.pointCount }}</td>
+              <td class="num col-lg">{{ row.pointCount }}</td>
               <td>
                 <button
                   type="button"

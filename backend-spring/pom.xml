@@ -23,6 +23,7 @@
         <jjwt.version>0.12.6</jjwt.version>
     </properties>
 
+    <!-- 依赖版本统一由 Spring Boot 父 POM 管理 -->
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>

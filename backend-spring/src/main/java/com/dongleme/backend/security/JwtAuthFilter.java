@@ -1,7 +1,6 @@
 package com.dongleme.backend.security;
 
 import com.dongleme.backend.entity.User;
-import com.dongleme.backend.mapper.UserMapper;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -21,11 +20,11 @@ import java.util.List;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final UserMapper userMapper;
+    private final UserLookupCache userLookupCache;
 
-    public JwtAuthFilter(JwtService jwtService, UserMapper userMapper) {
+    public JwtAuthFilter(JwtService jwtService, UserLookupCache userLookupCache) {
         this.jwtService = jwtService;
-        this.userMapper = userMapper;
+        this.userLookupCache = userLookupCache;
     }
 
     @Override
@@ -39,7 +38,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String token = header.substring(7).trim();
             try {
                 Claims claims = jwtService.parse(token);
-                User user = userMapper.selectById(claims.getSubject());
+                User user = userLookupCache.get(claims.getSubject());
                 if (user != null) {
                     AuthUser principal = AuthUser.of(user);
                     var authorities = List.of(new SimpleGrantedAuthority(

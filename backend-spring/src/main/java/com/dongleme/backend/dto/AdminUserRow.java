@@ -6,6 +6,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * 后台用户列表行：用户资料与打卡、轨迹统计的聚合结果。
+ */
 @Data
 public class AdminUserRow {
 
@@ -38,4 +41,9 @@ public class AdminUserRow {
     private Long weekMinutes;
 
     private Long routeCount;
+
+    /**
+     * 窗口函数带出的筛选结果总数，仅用于分页。
+     */
+    private Long total;
 }

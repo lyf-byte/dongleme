@@ -9,6 +9,7 @@ import com.dongleme.backend.dto.UserView;
 import com.dongleme.backend.entity.User;
 import com.dongleme.backend.mapper.UserMapper;
 import com.dongleme.backend.security.JwtService;
+import com.dongleme.backend.security.UserLookupCache;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -29,11 +30,17 @@ public class AuthService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final UserLookupCache userLookupCache;
 
-    public AuthService(UserMapper userMapper, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthService(
+            UserMapper userMapper,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService,
+            UserLookupCache userLookupCache) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.userLookupCache = userLookupCache;
     }
 
     public AuthResponse handle(AuthRequest request) {
@@ -46,7 +53,7 @@ public class AuthService {
     }
 
     public User requireUser(String id) {
-        User user = userMapper.selectById(id);
+        User user = userLookupCache.get(id);
         if (user == null) {
             throw ApiException.unauthorized("登录已过期，请重新登录");
         }
@@ -117,6 +124,7 @@ public class AuthService {
         patch.setId(current.getId());
         patch.setOnboarded(Boolean.TRUE.equals(onboarded));
         userMapper.updateById(patch);
+        userLookupCache.invalidate(userId);
 
         User saved = requireUser(userId);
         return Map.of("user", UserView.of(saved));

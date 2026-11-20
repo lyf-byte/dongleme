@@ -40,7 +40,7 @@ async function submit() {
       return
     }
 
-    await adminOverview()
+    await adminOverview(true)
     router.replace('/admin')
   } catch (error) {
     if (error?.response?.status === 403 || error?.status === 403) {
