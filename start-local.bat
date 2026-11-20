@@ -21,20 +21,28 @@ if not defined SERVER_PORT set "SERVER_PORT=8080"
 echo [1/3] Checking SSH tunnel...
 call :port_open 13306
 if errorlevel 1 (
-    if exist "D:\Edge\donglemei_new" (
-        start "dongleme-tunnel" /min cmd /c "ssh -i D:\Edge\donglemei_new -N -L 13306:127.0.0.1:3306 ubuntu@3.105.101.123 > .run\tunnel.log 2>&1"
-        call :wait_port 13306 15
-        if errorlevel 1 (
-            echo       tunnel not ready in 15s, see .run\tunnel.log
-        ) else (
-            echo       tunnel ready at 127.0.0.1:13306
-        )
+    if not defined DEPLOY_HOST goto :tunnel_skip
+    if not defined DEPLOY_SSH_KEY goto :tunnel_skip
+    if not exist "%DEPLOY_SSH_KEY%" (
+        echo       SSH key not found, skip tunnel
+        goto :tunnel_skip
+    )
+    start "dongleme-tunnel" /min cmd /c "ssh -i %DEPLOY_SSH_KEY% -N -L 13306:127.0.0.1:3306 %DEPLOY_HOST% > .run\tunnel.log 2>&1"
+    call :wait_port 13306 15
+    if errorlevel 1 (
+        echo       tunnel not ready in 15s, see .run\tunnel.log
     ) else (
-        echo       SSH key D:\Edge\donglemei_new not found, skip tunnel
+        echo       tunnel ready at 127.0.0.1:13306
     )
 ) else (
     echo       port 13306 already listening, skip tunnel
 )
+goto :tunnel_done
+
+:tunnel_skip
+echo       DEPLOY_HOST / DEPLOY_SSH_KEY not configured, skip tunnel
+
+:tunnel_done
 
 echo [2/3] Checking backend...
 call :port_open 8080

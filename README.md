@@ -2,13 +2,6 @@
 
 校园运动打卡全栈 Web App：记录运动、连续打卡、周榜排行，并用 AI 生成每周小结。
 
-## 线上地址
-
-- 用户端：<https://3.105.101.123.nip.io>
-- 后台入口：<https://3.105.101.123.nip.io/admin/login>
-- 实例：Ubuntu 24.04 / t3.small / 弹性 IP `3.105.101.123`
-- SSH：`ssh -i D:\Edge\donglemei_new ubuntu@3.105.101.123`
-
 ## 技术栈
 
 - 前端：Vue 3 + Vite + Vue Router + ECharts + Lucide 图标，手写设计系统
@@ -86,10 +79,10 @@ LLM_MODEL=Qwen/Qwen2.5-7B-Instruct
 
 ### 4. 启动 Spring Boot 后端
 
-如果数据库在 AWS，本地先开 SSH 隧道，并把 `.env` 的 `DB_PORT` 改成 `13306`：
+如果数据库在云服务器，本地先开 SSH 隧道，并把 `.env` 的 `DB_PORT` 改成 `13306`：
 
 ```bash
-ssh -i D:\Edge\donglemei_new -N -L 13306:127.0.0.1:3306 ubuntu@3.105.101.123
+ssh -i <你的 SSH 私钥路径> -N -L 13306:127.0.0.1:3306 <用户名>@<服务器地址>
 ```
 
 ```bash
@@ -142,7 +135,6 @@ npm run dev
 - 进程管理：systemd 服务 `donglemei-java`
 - 前端：`/opt/donglemei/dist`，由 Caddy 直接托管
 - HTTPS：Caddy + Let's Encrypt
-- 临时域名：`3.105.101.123.nip.io`
 - 旧 Node 服务 `donglemei` 已停止并禁用，unit 保留用于回滚
 
 Caddy 路由：
@@ -159,13 +151,13 @@ Caddy 路由：
 ```powershell
 cd backend-spring
 mvn -DskipTests package
-scp -i D:\Edge\donglemei_new backend-spring\target\dongleme-backend.jar ubuntu@3.105.101.123:/opt/donglemei/backend-spring/app.jar
+scp -i <你的 SSH 私钥路径> backend-spring\target\dongleme-backend.jar <用户名>@<服务器地址>:/opt/donglemei/backend-spring/app.jar
 ```
 
 2. 服务器更新前端并重启后端：
 
 ```bash
-ssh -i D:\Edge\donglemei_new ubuntu@3.105.101.123
+ssh -i <你的 SSH 私钥路径> <用户名>@<服务器地址>
 cd /opt/donglemei
 git pull
 npm ci
