@@ -1,10 +1,30 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { haversineMeters, shouldAcceptPoint, MAX_POINTS } from '../utils/geo'
 import { wgs84ToGcj02 } from '../utils/coord'
+import {
+  hasNativeLocation,
+  nativeIsTracking,
+  nativePendingPoints,
+  nativeStartTracking,
+  nativeStopTracking
+} from '../utils/native'
 
 const DRAFT_KEY = 'dlm_route_draft'
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000
 const PERSIST_INTERVAL_MS = 2000
+
+// 原生壳通过 evaluateJavascript 回调这两个全局函数，先留好入口
+let positionSink = null
+let permissionSink = null
+
+if (typeof window !== 'undefined') {
+  window.__donglemeGeo = (point) => {
+    if (positionSink) positionSink(point)
+  }
+  window.__donglemeGeoPermission = (granted) => {
+    if (permissionSink) permissionSink(Boolean(granted))
+  }
+}
 
 function newClientId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -48,6 +68,8 @@ export function useTracker() {
   const pointLimitReached = ref(false)
 
   let watchId = null
+  let usingNative = false
+  let lastNativeTs = 0
   let timer = null
   let pausedAt = 0
   let pausedMs = 0
@@ -70,7 +92,11 @@ export function useTracker() {
   const canSave = computed(() => points.value.length >= 2 && distance.value >= 50)
 
   function startWatch() {
-    if (watchId !== null) return
+    if (watchId !== null || usingNative) return
+    if (hasNativeLocation()) {
+      startNativeWatch()
+      return
+    }
     if (!('geolocation' in navigator)) {
       error.value = '当前浏览器不支持定位'
       return
@@ -82,19 +108,77 @@ export function useTracker() {
     })
   }
 
+  function startNativeWatch() {
+    usingNative = true
+    lastNativeTs = 0
+    positionSink = feedNativePoint
+    permissionSink = handleNativePermission
+    const result = nativeStartTracking()
+    if (result === 'permission_requested') {
+      error.value = '正在申请定位权限…'
+    } else if (result !== 'ok') {
+      usingNative = false
+      error.value = '无法启动定位服务'
+      return
+    }
+    syncNativeBacklog()
+  }
+
+  /** 后台期间的点由原生缓存，回到前台一次性补上。 */
+  function syncNativeBacklog() {
+    if (!usingNative) return
+    const backlog = nativePendingPoints()
+    if (backlog.length === 0) return
+    backlog.forEach(feedNativePoint)
+  }
+
+  function feedNativePoint(point) {
+    if (!point) return
+    const lat = Number(point.lat)
+    const lng = Number(point.lng)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
+    const ts = Number(point.ts) || Date.now()
+    if (ts <= lastNativeTs) return
+    lastNativeTs = ts
+    applyPosition(lat, lng, Number(point.acc), ts)
+  }
+
+  function handleNativePermission(granted) {
+    if (granted) {
+      if (error.value) error.value = ''
+      syncNativeBacklog()
+      return
+    }
+    error.value = '定位权限被拒绝，请在系统设置中允许定位'
+    if (status.value === 'tracking') {
+      status.value = 'paused'
+      pausedAt = Date.now()
+      stopWatch()
+      releaseWakeLock()
+      persistDraft(true)
+    }
+  }
+
   function onPosition(position) {
-    const coords = position.coords
-    const acc = coords.accuracy
-    const gcj = wgs84ToGcj02(coords.longitude, coords.latitude)
+    applyPosition(
+      position.coords.latitude,
+      position.coords.longitude,
+      position.coords.accuracy,
+      Date.now()
+    )
+  }
+
+  function applyPosition(latitude, longitude, acc, timestamp) {
+    const gcj = wgs84ToGcj02(longitude, latitude)
     const lat = gcj.lat
     const lng = gcj.lng
-    current.value = { lat, lng, acc, timestamp: Date.now() }
+    current.value = { lat, lng, acc, timestamp }
     if (error.value) error.value = ''
 
     if (status.value !== 'tracking') return
 
     const last = points.value[points.value.length - 1]
-    const t = Math.max(0, Math.floor((Date.now() - startedAt.value - pausedMs) / 1000))
+    const t = Math.max(0, Math.floor((timestamp - startedAt.value - pausedMs) / 1000))
     if (last) {
       const gap = haversineMeters(last.lat, last.lng, lat, lng)
       if (t - last.t < 3 && gap < 15) return
@@ -145,6 +229,12 @@ export function useTracker() {
   }
 
   function stopWatch() {
+    if (usingNative) {
+      nativeStopTracking()
+      usingNative = false
+      positionSink = null
+      permissionSink = null
+    }
     if (watchId !== null) {
       navigator.geolocation.clearWatch(watchId)
       watchId = null
@@ -342,7 +432,20 @@ export function useTracker() {
   }
 
   function handleVisibility() {
-    if (document.visibilityState === 'visible' && status.value === 'tracking') {
+    if (document.visibilityState !== 'visible') return
+
+    // 通知栏里点了「结束记录」，页面这边要跟着停
+    if (usingNative && status.value === 'tracking' && !nativeIsTracking()) {
+      status.value = 'paused'
+      pausedAt = Date.now()
+      stopWatch()
+      releaseWakeLock()
+      persistDraft(true)
+      return
+    }
+
+    syncNativeBacklog()
+    if (status.value === 'tracking') {
       requestWakeLock()
     }
   }
@@ -350,6 +453,10 @@ export function useTracker() {
   onMounted(() => {
     loadDraft()
     document.addEventListener('visibilitychange', handleVisibility)
+    // 上次异常退出可能留下空转的前台服务，这里收掉
+    if (status.value === 'idle' && hasNativeLocation() && nativeIsTracking()) {
+      nativeStopTracking()
+    }
   })
 
   onUnmounted(() => {

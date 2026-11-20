@@ -71,7 +71,14 @@ const router = createRouter({
   routes
 })
 
+// 移动端包只放用户端，管理后台留在 Web 上
+const isNativeShell = import.meta.env.VITE_PLATFORM === 'native'
+
 router.beforeEach((to) => {
+  if (isNativeShell && to.path.startsWith('/admin')) {
+    return { path: '/' }
+  }
+
   if (to.path.startsWith('/admin')) {
     const { user: adminUser } = getAdminAuthState()
     const isAdmin = adminUser?.isAdmin === true

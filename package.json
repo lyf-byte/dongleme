@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:native": "vite build --mode native",
     "preview": "vite preview",
     "test:backend": "mvn -f backend-spring/pom.xml test"
   },

@@ -5,6 +5,7 @@ import { ArrowLeft, Check, Download, Minus, Navigation, Plus, Settings2 } from '
 import { getProfile, getCustomSports, submitCheckin, errorMessage } from '../utils/api'
 import { SPORTS, calcCalories, mergeSports } from '../utils/sport'
 import { toast, confirmDialog } from '../utils/ui'
+import { saveBlob } from '../utils/native'
 import CustomSportManager from '../components/CustomSportManager.vue'
 
 const route = useRoute()
@@ -212,20 +213,13 @@ function saveSuccessPoster() {
   ctx.font = `bold 42px ${font}`
   ctx.fillText('动', 291, 764)
 
-  canvas.toBlob((blob) => {
+  canvas.toBlob(async (blob) => {
     if (!blob) {
       toast('海报生成失败')
       return
     }
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `dongleme-checkin-${data.date || 'today'}.png`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    toast('打卡海报已保存')
+    const result = await saveBlob(blob, `dongleme-checkin-${data.date || 'today'}.png`)
+    toast(result === 'ok' ? '打卡海报已保存' : '保存失败，请重试')
   }, 'image/png')
 }
 

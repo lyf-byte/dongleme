@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { Copy, Download, RefreshCw, Sparkles } from 'lucide-vue-next'
 import { generateSummary, errorMessage } from '../utils/api'
 import { toast } from '../utils/ui'
+import { saveBlob } from '../utils/native'
 import emptySummary from '../assets/empty-summary.svg'
 
 const loading = ref(true)
@@ -165,20 +166,13 @@ function savePoster() {
   ctx.font = `26px ${font}`
   ctx.fillText('每天动一点，连续看得见', 64, 922)
 
-  canvas.toBlob((blob) => {
+  canvas.toBlob(async (blob) => {
     if (!blob) {
       toast('海报生成失败')
       return
     }
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `dongleme-${weekStart.value || 'summary'}.png`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    toast('海报已保存')
+    const result = await saveBlob(blob, `dongleme-${weekStart.value || 'summary'}.png`)
+    toast(result === 'ok' ? '海报已保存' : '保存失败，请重试')
   }, 'image/png')
 }
 

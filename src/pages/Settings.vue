@@ -17,6 +17,7 @@ import {
 import { clearRecords, errorMessage, getProfile } from '../utils/api'
 import { changePassword, getUser, signOut } from '../utils/auth'
 import { todayShanghai } from '../utils/sport'
+import { saveBlob } from '../utils/native'
 import { confirmDialog, toast } from '../utils/ui'
 
 const router = useRouter()
@@ -87,15 +88,8 @@ async function exportData() {
   try {
     const data = await getProfile({ export: 1 })
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `dongleme-${todayShanghai()}.json`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    toast('已导出')
+    const result = await saveBlob(blob, `dongleme-${todayShanghai()}.json`)
+    toast(result === 'ok' ? '已导出' : '导出失败，请重试')
   } catch (error) {
     toast(errorMessage(error, '导出失败'))
   }
