@@ -15,6 +15,9 @@ backend-spring/target
 .DS_Store
 npm-debug.log*
 
+# 本地部署信息，不提交
+/DEPLOY.local.md
+
 # 本地设计素材与草稿，不提交
 /动了么-全栈项目详细提示词.md
 /头像.png
