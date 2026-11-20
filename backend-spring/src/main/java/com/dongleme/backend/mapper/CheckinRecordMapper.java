@@ -2,6 +2,8 @@ package com.dongleme.backend.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.dongleme.backend.dto.AdminRecentRow;
+import com.dongleme.backend.dto.AdminTrendRow;
+import com.dongleme.backend.dto.AdminTypeStatRow;
 import com.dongleme.backend.entity.CheckinRecord;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
@@ -25,9 +27,31 @@ public interface CheckinRecordMapper extends BaseMapper<CheckinRecord> {
     long countActiveUsers(@Param("date") LocalDate date);
 
     @Select("""
+            select count(*) from records where date = #{date}
+            """)
+    long countByDate(@Param("date") LocalDate date);
+
+    @Select("""
             select coalesce(sum(duration), 0) from records where date >= #{weekStart}
             """)
     long sumMinutesSince(@Param("weekStart") LocalDate weekStart);
+
+    @Select("""
+            select date as date, count(*) as records, count(distinct user_id) as users
+            from records
+            where date >= #{from}
+            group by date
+            order by date asc
+            """)
+    List<AdminTrendRow> selectTrend(@Param("from") LocalDate from);
+
+    @Select("""
+            select type as name, count(*) as count, coalesce(sum(duration), 0) as minutes
+            from records
+            group by type
+            order by count desc, minutes desc
+            """)
+    List<AdminTypeStatRow> selectTypeStats();
 
     @Select("""
             select r.id, r.date, r.type, r.duration, r.calories, u.nickname

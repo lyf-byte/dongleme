@@ -52,6 +52,11 @@ const routes = [
         component: () => import('../pages/admin/AdminRecords.vue')
       },
       {
+        path: 'routes',
+        name: 'admin-routes',
+        component: () => import('../pages/admin/AdminRoutes.vue')
+      },
+      {
         path: 'rank',
         name: 'admin-rank',
         component: () => import('../pages/admin/AdminRank.vue')

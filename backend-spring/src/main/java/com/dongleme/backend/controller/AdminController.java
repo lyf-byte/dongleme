@@ -30,6 +30,10 @@ public class AdminController {
             @RequestParam(name = "action", required = false) String action,
             @RequestParam(name = "query", required = false) String query,
             @RequestParam(name = "type", required = false) String type,
+            @RequestParam(name = "filter", required = false) String filter,
+            @RequestParam(name = "sort", required = false) String sort,
+            @RequestParam(name = "scope", required = false) String scope,
+            @RequestParam(name = "id", required = false) String id,
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "pageSize", defaultValue = "20") int pageSize,
             @RequestParam(name = "from", required = false)
@@ -40,9 +44,11 @@ public class AdminController {
         String normalized = action == null || action.isBlank() ? "overview" : action;
         return switch (normalized) {
             case "overview" -> adminService.overview();
-            case "users" -> adminService.users(query, page, pageSize);
-            case "records" -> adminService.records(type, from, to, page, pageSize);
-            case "rank" -> adminService.rank();
+            case "users" -> adminService.users(query, filter, sort, page, pageSize);
+            case "user" -> adminService.userDetail(requireId(id));
+            case "records" -> adminService.records(query, type, from, to, page, pageSize);
+            case "routes" -> adminService.routes(query, type, from, to, page, pageSize);
+            case "rank" -> adminService.rank(scope);
             case "types" -> Map.of("types", adminService.types());
             default -> throw new ApiException(HttpStatus.NOT_FOUND, "未知的后台操作");
         };
@@ -57,5 +63,12 @@ public class AdminController {
             throw ApiException.unauthorized("登录已过期，请重新登录");
         }
         return adminService.delete(action == null ? "" : action, id, principal.id());
+    }
+
+    private static String requireId(String id) {
+        if (id == null || id.isBlank()) {
+            throw ApiException.badRequest("缺少 id");
+        }
+        return id;
     }
 }

@@ -200,11 +200,17 @@ export const adminOverview = () =>
 export const adminUsers = (params = {}) =>
   adminApi.get('/admin', { params: { action: 'users', ...params } }).then((res) => res.data)
 
+export const adminUserDetail = (id) =>
+  adminApi.get('/admin', { params: { action: 'user', id } }).then((res) => res.data)
+
 export const adminRecords = (params = {}) =>
   adminApi.get('/admin', { params: { action: 'records', ...params } }).then((res) => res.data)
 
-export const adminRank = () =>
-  adminApi.get('/admin', { params: { action: 'rank' } }).then((res) => res.data)
+export const adminRoutes = (params = {}) =>
+  adminApi.get('/admin', { params: { action: 'routes', ...params } }).then((res) => res.data)
+
+export const adminRank = (scope = 'week') =>
+  adminApi.get('/admin', { params: { action: 'rank', scope } }).then((res) => res.data)
 
 export const adminRecordTypes = () =>
   adminApi.get('/admin', { params: { action: 'types' } }).then((res) => res.data.types || [])
@@ -214,6 +220,9 @@ export const adminDeleteUser = (id) =>
 
 export const adminDeleteRecord = (id) =>
   adminApi.delete('/admin', { params: { action: 'record', id } }).then((res) => res.data)
+
+export const adminDeleteRoute = (id) =>
+  adminApi.delete('/admin', { params: { action: 'route', id } }).then((res) => res.data)
 
 export function errorMessage(error, fallback = '操作失败，请稍后再试') {
   return error?.response?.data?.message || error?.message || fallback

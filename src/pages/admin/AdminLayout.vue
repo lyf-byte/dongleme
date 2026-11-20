@@ -1,7 +1,15 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ClipboardList, LayoutDashboard, LogOut, Trophy, Users } from 'lucide-vue-next'
+import {
+  ClipboardList,
+  LayoutDashboard,
+  LogOut,
+  Route as RouteIcon,
+  Trophy,
+  UserRound,
+  Users
+} from 'lucide-vue-next'
 import { getAdminUser, adminSignOut } from '../../utils/auth'
 import { confirmDialog } from '../../utils/ui'
 import '../../styles/admin.css'
@@ -10,11 +18,20 @@ const route = useRoute()
 const router = useRouter()
 const account = ref('')
 
-const tabs = [
-  { label: '数据概览', path: '/admin', icon: LayoutDashboard },
-  { label: '用户管理', path: '/admin/users', icon: Users },
-  { label: '打卡记录', path: '/admin/records', icon: ClipboardList },
-  { label: '排行榜', path: '/admin/rank', icon: Trophy }
+const groups = [
+  {
+    label: '运营',
+    items: [
+      { label: '数据概览', path: '/admin', icon: LayoutDashboard },
+      { label: '用户管理', path: '/admin/users', icon: Users },
+      { label: '打卡记录', path: '/admin/records', icon: ClipboardList },
+      { label: '运动轨迹', path: '/admin/routes', icon: RouteIcon }
+    ]
+  },
+  {
+    label: '榜单',
+    items: [{ label: '排行榜', path: '/admin/rank', icon: Trophy }]
+  }
 ]
 
 function isActive(item) {
@@ -55,21 +72,27 @@ onMounted(() => {
       </div>
 
       <nav class="admin-nav">
-        <router-link
-          v-for="item in tabs"
-          :key="item.path"
-          :to="item.path"
-          :class="{ active: isActive(item) }"
-        >
-          <component :is="item.icon" :size="18" />
-          {{ item.label }}
-        </router-link>
+        <template v-for="group in groups" :key="group.label">
+          <div class="admin-nav__label">{{ group.label }}</div>
+          <router-link
+            v-for="item in group.items"
+            :key="item.path"
+            :to="item.path"
+            :class="{ active: isActive(item) }"
+          >
+            <component :is="item.icon" :size="17" />
+            {{ item.label }}
+          </router-link>
+        </template>
       </nav>
 
       <div class="admin-side__footer">
-        <div class="admin-account">{{ account }}</div>
+        <div class="admin-account">
+          <UserRound :size="14" />
+          <span>{{ account }}</span>
+        </div>
         <button type="button" class="admin-logout" @click="logout">
-          <LogOut :size="16" />
+          <LogOut :size="15" />
           退出登录
         </button>
       </div>
@@ -80,13 +103,3 @@ onMounted(() => {
     </main>
   </div>
 </template>
-
-<style scoped>
-.admin-account {
-  padding: 0 12px 8px;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 16px;
-  word-break: break-all;
-}
-</style>
