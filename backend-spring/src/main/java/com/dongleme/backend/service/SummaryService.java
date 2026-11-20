@@ -117,6 +117,7 @@ public class SummaryService {
 
         String fallback = buildFallback(stats);
         if (llmUrl == null || llmUrl.isBlank() || llmKey == null || llmKey.isBlank()) {
+            saveSummary(userId, weekStart, fallback, cached, force, cachedRegenCount);
             return new SummaryView(weekStart, fallback, false, true, null, null);
         }
 
@@ -133,8 +134,24 @@ public class SummaryService {
 
             return new SummaryView(weekStart, content, false, null, null, null);
         } catch (Exception exception) {
+            saveSummary(userId, weekStart, fallback, cached, force, cachedRegenCount);
             return new SummaryView(weekStart, fallback, false, true, null, null);
         }
+    }
+
+    private void saveSummary(
+            String userId,
+            LocalDate weekStart,
+            String content,
+            WeeklySummary cached,
+            boolean force,
+            int cachedRegenCount) {
+        WeeklySummary summary = new WeeklySummary();
+        summary.setUserId(userId);
+        summary.setWeekStart(weekStart);
+        summary.setContent(content);
+        summary.setRegenCount(cached != null && force ? cachedRegenCount + 1 : 0);
+        summaryMapper.upsert(summary);
     }
 
     private boolean hasNewRecords(String userId, WeeklySummary cached) {

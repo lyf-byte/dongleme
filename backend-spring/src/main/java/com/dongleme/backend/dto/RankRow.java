@@ -9,5 +9,7 @@ public class RankRow {
 
     private String nickname;
 
+    private String gender;
+
     private Long weeklyMinutes;
 }

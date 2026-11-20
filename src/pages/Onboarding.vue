@@ -5,7 +5,7 @@ import { ArrowRight } from 'lucide-vue-next'
 import { completeOnboarding } from '../utils/auth'
 import { updateProfile, errorMessage } from '../utils/api'
 import { toast } from '../utils/ui'
-import onboardingArt from '../assets/onboarding.svg'
+import onboardingArt from '../assets/onboarding.jpg'
 
 const route = useRoute()
 const router = useRouter()
@@ -153,8 +153,10 @@ async function submit() {
 .onboarding-art {
   display: block;
   width: 100%;
-  max-height: 190px;
+  height: auto;
   margin: 0 0 16px;
+  border-radius: 22px;
+  box-shadow: 0 16px 36px rgba(47, 107, 255, 0.16);
 }
 
 .profile-preview {

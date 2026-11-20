@@ -1,5 +1,5 @@
 const SKY = {
-  sunny: { day: ['#f6b21b', '#f98a1b', '#f97316'], night: ['#1e3a8a', '#16255f', '#0f172a'] },
+  sunny: { day: ['#3d78d8', '#5a8fd8', '#7aa6cf'], night: ['#1e3a8a', '#16255f', '#0f172a'] },
   cloudy: { day: ['#5b7c99', '#3f5a75', '#233446'], night: ['#33465e', '#243447', '#141e2b'] },
   overcast: { day: ['#5c6b7a', '#46525e', '#2f3a45'], night: ['#3a4450', '#2b333c', '#1b2129'] },
   rain: { day: ['#2c5364', '#1d3a47', '#0f2027'], night: ['#1b3540', '#12242e', '#08131a'] },
@@ -357,11 +357,11 @@ export class WeatherEngine {
     if (this.isDay) {
       const horizon = ctx.createLinearGradient(0, h * 0.55, 0, h)
       horizon.addColorStop(0, 'rgba(255,220,150,0)')
-      horizon.addColorStop(1, 'rgba(255,220,150,.1)')
+      horizon.addColorStop(1, 'rgba(255,220,150,.06)')
       ctx.fillStyle = horizon
       ctx.fillRect(0, h * 0.55, w, h * 0.45)
 
-      const glow = ctx.createRadialGradient(this.sunX, this.sunY, 0, this.sunX, this.sunY, w * 0.72)
+      const glow = ctx.createRadialGradient(this.sunX, this.sunY, 0, this.sunX, this.sunY, w * 0.6)
       glow.addColorStop(0, 'rgba(255,228,160,.18)')
       glow.addColorStop(0.45, 'rgba(255,200,110,.06)')
       glow.addColorStop(1, 'rgba(255,200,110,0)')
@@ -464,15 +464,15 @@ export class WeatherEngine {
     }
     if (this.type !== 'sunny' && !['fog', 'haze'].includes(this.type)) return
     const dim = this.type === 'fog' ? 0.4 : this.type === 'haze' ? 0.6 : 1
-    const radius = h * 0.14
+    const radius = h * 0.13
 
     ctx.globalCompositeOperation = 'lighter'
-    ctx.globalAlpha = (0.45 + 0.15 * Math.sin(this.t * 0.9)) * dim
-    const haloSize = radius * 4.4
+    ctx.globalAlpha = (0.42 + 0.1 * Math.sin(this.t * 0.9)) * dim
+    const haloSize = radius * 4
     ctx.drawImage(this.sprites.glow, x - haloSize / 2, y - haloSize / 2, haloSize, haloSize)
 
     if (this.type === 'sunny') {
-      ctx.fillStyle = 'rgba(255,240,200,.05)'
+      ctx.fillStyle = 'rgba(255,240,200,.06)'
       for (let beam = 0; beam < 12; beam++) {
         const angle = beam * Math.PI / 6 + this.t * 0.06
         const inner = radius * 1.15
@@ -487,7 +487,7 @@ export class WeatherEngine {
       }
       const flareDirX = (this.w * 0.3 - x)
       const flareDirY = (this.h * 0.65 - y)
-      const flares = [[0.35, 9, 0.06], [0.62, 5, 0.05], [0.9, 13, 0.035]]
+      const flares = [[0.35, 8, 0.05], [0.62, 5, 0.04], [0.9, 12, 0.028]]
       for (const [k, r, alpha] of flares) {
         ctx.globalAlpha = alpha
         ctx.fillStyle = 'rgba(255,236,180,1)'
@@ -500,10 +500,10 @@ export class WeatherEngine {
 
     ctx.globalAlpha = dim
     const core = ctx.createRadialGradient(x - radius * 0.25, y - radius * 0.25, radius * 0.1, x, y, radius)
-    core.addColorStop(0, '#fffef2')
-    core.addColorStop(0.45, '#ffe9a0')
-    core.addColorStop(0.8, '#ffc84a')
-    core.addColorStop(1, 'rgba(255,157,46,0)')
+    core.addColorStop(0, '#fffef6')
+    core.addColorStop(0.45, '#fff2c8')
+    core.addColorStop(0.8, '#ffdf9a')
+    core.addColorStop(1, 'rgba(255,200,110,0)')
     ctx.fillStyle = core
     ctx.beginPath()
     ctx.arc(x, y, radius, 0, Math.PI * 2)

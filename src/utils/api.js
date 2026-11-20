@@ -80,6 +80,29 @@ export async function submitCheckin(payload) {
   return result
 }
 
+export async function createRoute(payload) {
+  const result = await api.post('/routes', payload).then((res) => res.data)
+  clearApiCache()
+  return result
+}
+
+export async function getRoutes(limit = 20) {
+  const result = await api
+    .get('/routes', { params: { limit } })
+    .then((res) => res.data)
+  return result.routes || []
+}
+
+export async function getRoute(id) {
+  return api.get(`/routes/${id}`).then((res) => res.data)
+}
+
+export async function deleteRoute(id) {
+  const result = await api.delete(`/routes/${id}`).then((res) => res.data)
+  clearApiCache()
+  return result
+}
+
 export async function getStats(range = '7d') {
   const cached = statsCache.get(range)
   if (cached && Date.now() - cached.at < DATA_TTL) return cached.data

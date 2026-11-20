@@ -7,12 +7,15 @@ import {
   Check,
   Clock3,
   Flame,
+  LayoutGrid,
+  Navigation,
   Plus,
   RefreshCw,
   Settings2
 } from 'lucide-vue-next'
 import { getProfile, getCustomSports } from '../utils/api'
 import { mergeSports } from '../utils/sport'
+import { avatarFor } from '../utils/avatar'
 import WeatherInline from '../components/WeatherInline.vue'
 import WeatherScene from '../components/WeatherScene.vue'
 import WeatherCanvas from '../components/WeatherCanvas.vue'
@@ -26,6 +29,8 @@ const canvasFallback = ref(false)
 const customSports = ref([])
 const managerOpen = ref(false)
 const allSports = computed(() => mergeSports(customSports.value))
+const homeSports = computed(() => allSports.value.slice(0, 6))
+const hasMoreSports = computed(() => allSports.value.length > 6)
 
 const todayRef = ref(new Date())
 const todayStr = computed(() =>
@@ -75,6 +80,7 @@ const reminderText = computed(() => {
 })
 
 const avatarText = computed(() => (profile.value?.nickname || '动').slice(0, 1))
+const avatarSrc = computed(() => avatarFor(profile.value?.gender))
 const today = computed(
   () => profile.value?.today || { minutes: 0, calories: 0, types: [] }
 )
@@ -83,6 +89,21 @@ const weeklyGoal = computed(() => profile.value?.weeklyGoal || 150)
 const progress = computed(() =>
   Math.min(100, Math.round((weekMinutes.value / weeklyGoal.value) * 100))
 )
+const recentRecords = computed(() => (profile.value?.recent || []).slice(0, 3))
+
+function recordIcon(type) {
+  return allSports.value.find((sport) => sport.name === type)?.icon || Clock3
+}
+
+function formatRecordDate(value) {
+  if (!value) return ''
+  if (value === todayStr.value) return '今天'
+  const date = new Date(`${value}T00:00:00Z`)
+  const todayDate = new Date(`${todayStr.value}T00:00:00Z`)
+  const diff = Math.round((todayDate - date) / 86400000)
+  if (diff === 1) return '昨天'
+  return `${date.getUTCMonth() + 1}月${date.getUTCDate()}日`
+}
 
 const weekTip = computed(() => {
   if (!profile.value) return ''
@@ -146,7 +167,8 @@ onUnmounted(() => {
       <div>
         <h1>{{ greet }}，{{ profile?.nickname || '运动新人' }}</h1>
       </div>
-      <div class="avatar">{{ avatarText }}</div>
+      <img v-if="avatarSrc" :src="avatarSrc" alt="" class="avatar" />
+      <div v-else class="avatar">{{ avatarText }}</div>
     </header>
 
     <template v-if="loading">
@@ -262,6 +284,32 @@ onUnmounted(() => {
         <p>{{ weekTip }}</p>
       </section>
 
+      <template v-if="recentRecords.length">
+        <div class="section-title">
+          <h2>最近记录</h2>
+          <button type="button" class="link-btn" @click="router.push('/stats')">
+            查看统计
+          </button>
+        </div>
+
+        <div class="recent-records">
+          <div
+            v-for="(item, index) in recentRecords"
+            :key="`${item.date}-${item.type}-${index}`"
+            class="recent-record"
+          >
+            <span class="recent-record__icon">
+              <component :is="recordIcon(item.type)" :size="15" />
+            </span>
+            <span class="recent-record__main">
+              <strong>{{ item.type }}</strong>
+              <small>{{ formatRecordDate(item.date) }} · {{ item.duration }} 分钟</small>
+            </span>
+            <span class="recent-record__cal">{{ item.calories }}<small>千卡</small></span>
+          </div>
+        </div>
+      </template>
+
       <div class="section-title">
         <h2>选择运动</h2>
         <button type="button" class="manage-btn" @click="managerOpen = true">
@@ -272,7 +320,7 @@ onUnmounted(() => {
 
       <div class="sport-grid">
         <button
-          v-for="(sport, index) in allSports"
+          v-for="(sport, index) in homeSports"
           :key="sport.custom ? `custom-${sport.id}` : sport.name"
           type="button"
           class="sport-card"
@@ -287,12 +335,29 @@ onUnmounted(() => {
           <span class="sport-name">{{ sport.name }}</span>
           <span class="sport-met">MET {{ sport.met.toFixed(1) }}</span>
         </button>
+
+        <button
+          v-if="hasMoreSports"
+          type="button"
+          class="sport-card"
+          @click="goCheckin()"
+        >
+          <span class="sport-icon sport-icon--more"><LayoutGrid :size="20" /></span>
+          <span class="sport-name">全部运动</span>
+          <span class="sport-met">共 {{ allSports.length }} 项</span>
+        </button>
       </div>
 
-      <button type="button" class="btn-primary home-cta" @click="goCheckin()">
-        <Plus :size="18" />
-        记录一次运动
-      </button>
+      <div class="home-actions">
+        <button type="button" class="btn-primary home-cta" @click="goCheckin()">
+          <Plus :size="18" />
+          记录一次运动
+        </button>
+        <button type="button" class="home-track" @click="router.push('/track')">
+          <Navigation :size="18" />
+          轨迹运动
+        </button>
+      </div>
 
       <CustomSportManager v-model="managerOpen" @changed="handleSportsChanged" />
     </template>
@@ -345,12 +410,14 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: linear-gradient(
-    90deg,
-    rgba(2, 8, 23, 0.3),
-    rgba(2, 8, 23, 0.08) 54%,
-    transparent 76%
-  );
+  background:
+    linear-gradient(180deg, transparent 55%, rgba(2, 8, 23, 0.18) 100%),
+    linear-gradient(
+      90deg,
+      rgba(2, 8, 23, 0.3),
+      rgba(2, 8, 23, 0.08) 54%,
+      transparent 76%
+    );
   pointer-events: none;
 }
 
@@ -375,8 +442,8 @@ onUnmounted(() => {
 }
 
 .streak-card.streak-card--sunny {
-  background: linear-gradient(135deg, #f6b21b, #f97316);
-  box-shadow: 0 14px 30px rgba(249, 115, 22, 0.28);
+  background: linear-gradient(160deg, #3d78d8, #5a8fd8 55%, #7aa6cf);
+  box-shadow: 0 14px 30px rgba(61, 120, 216, 0.28);
 }
 
 .streak-card.streak-card--sunny.is-night {
@@ -784,6 +851,11 @@ onUnmounted(() => {
   color: var(--violet);
 }
 
+.sport-icon--more {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
 .manage-btn {
   display: inline-flex;
   align-items: center;
@@ -809,8 +881,108 @@ onUnmounted(() => {
   color: var(--muted);
 }
 
-.home-cta {
+.home-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
   margin-top: 18px;
+}
+
+.home-cta {
+  margin-top: 0;
+}
+
+.link-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.recent-records {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  padding: 2px 14px;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+}
+
+.recent-record {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.recent-record:first-child {
+  border-top: 0;
+}
+
+.recent-record__icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.recent-record__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.recent-record__main strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.recent-record__main small {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.recent-record__cal {
+  flex: 0 0 auto;
+  color: var(--orange);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.recent-record__cal small {
+  margin-left: 1px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.home-track {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 50px;
+  border: 1px solid rgba(47, 107, 255, 0.28);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--blue);
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(47, 107, 255, 0.08);
+}
+
+.home-track:active {
+  transform: scale(0.99);
 }
 
 @media (max-width: 480px) {

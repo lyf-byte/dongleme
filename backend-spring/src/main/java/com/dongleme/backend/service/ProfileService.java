@@ -9,9 +9,11 @@ import com.dongleme.backend.dto.ProfileUpdateRequest;
 import com.dongleme.backend.dto.ProfileView;
 import com.dongleme.backend.dto.RecordView;
 import com.dongleme.backend.dto.SummaryExportView;
+import com.dongleme.backend.entity.ActivityRoute;
 import com.dongleme.backend.entity.CheckinRecord;
 import com.dongleme.backend.entity.User;
 import com.dongleme.backend.entity.WeeklySummary;
+import com.dongleme.backend.mapper.ActivityRouteMapper;
 import com.dongleme.backend.mapper.CheckinRecordMapper;
 import com.dongleme.backend.mapper.SummaryMapper;
 import com.dongleme.backend.mapper.UserMapper;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,16 +40,19 @@ public class ProfileService {
     private final UserMapper userMapper;
     private final CheckinRecordMapper recordMapper;
     private final SummaryMapper summaryMapper;
+    private final ActivityRouteMapper routeMapper;
 
     public ProfileService(
             AuthService authService,
             UserMapper userMapper,
             CheckinRecordMapper recordMapper,
-            SummaryMapper summaryMapper) {
+            SummaryMapper summaryMapper,
+            ActivityRouteMapper routeMapper) {
         this.authService = authService;
         this.userMapper = userMapper;
         this.recordMapper = recordMapper;
         this.summaryMapper = summaryMapper;
+        this.routeMapper = routeMapper;
     }
 
     public ProfileView getProfile(String userId) {
@@ -88,6 +94,16 @@ public class ProfileService {
         }
 
         ProfileBasicView basic = ProfileBasicView.of(user);
+        List<ProfileView.RecentRecord> recent = rows.stream()
+                .filter(row -> row.getId() != null)
+                .sorted(Comparator.comparing(CheckinRecord::getId).reversed())
+                .limit(5)
+                .map(row -> new ProfileView.RecentRecord(
+                        row.getDate(),
+                        row.getType(),
+                        row.getDuration() == null ? 0 : row.getDuration(),
+                        row.getCalories() == null ? 0 : row.getCalories()))
+                .toList();
         return new ProfileView(
                 basic.nickname(),
                 basic.gender(),
@@ -98,7 +114,8 @@ public class ProfileService {
                 weekMinutes,
                 List.copyOf(weekDays),
                 new ProfileView.Today(todayMinutes, todayCalories, List.copyOf(todayTypes)),
-                new ProfileView.Totals(rows.size(), totalMinutes, totalCalories)
+                new ProfileView.Totals(rows.size(), totalMinutes, totalCalories),
+                recent
         );
     }
 
@@ -167,6 +184,8 @@ public class ProfileService {
     public Map<String, Object> clear(String userId) {
         authService.requireUser(userId);
 
+        routeMapper.delete(
+                Wrappers.<ActivityRoute>lambdaQuery().eq(ActivityRoute::getUserId, userId));
         recordMapper.delete(
                 Wrappers.<CheckinRecord>lambdaQuery().eq(CheckinRecord::getUserId, userId));
         summaryMapper.delete(

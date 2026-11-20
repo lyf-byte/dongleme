@@ -1,9 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowRight, Eye, EyeOff, Lock, ShieldCheck, UserRound } from 'lucide-vue-next'
+import { ArrowRight, CalendarCheck, Eye, EyeOff, Footprints, Leaf, Lock, ShieldCheck, Trophy, UserRound } from 'lucide-vue-next'
 import { signIn, signUp } from '../utils/auth'
-import authHero from '../assets/auth-hero.svg'
+import authHero from '../assets/auth-hero.jpg'
 
 const route = useRoute()
 const router = useRouter()
@@ -106,18 +106,28 @@ async function onSubmit() {
 <template>
   <div class="auth">
     <header class="auth-hero">
+      <img class="auth-illustration" :src="authHero" alt="" aria-hidden="true" />
+      <div class="auth-hero__fade" aria-hidden="true"></div>
       <div class="auth-brand">
         <img class="auth-logo" src="/logo.svg" alt="动了么" />
         <div>
           <h1>动了么</h1>
-          <p>每天动一点，连续看得见</p>
+          <p>每天动一点，<span>连续看得见</span></p>
         </div>
       </div>
-      <img class="auth-illustration" :src="authHero" alt="" aria-hidden="true" />
       <div class="auth-tags">
-        <span class="chip chip--blue">连续打卡</span>
-        <span class="chip chip--yellow">校园排行</span>
-        <span class="chip chip--green">AI 小结</span>
+        <span class="auth-tag auth-tag--blue">
+          <CalendarCheck :size="14" />
+          连续打卡
+        </span>
+        <span class="auth-tag auth-tag--yellow">
+          <Trophy :size="14" />
+          校园排行
+        </span>
+        <span class="auth-tag auth-tag--green">
+          <Leaf :size="14" />
+          AI 小结
+        </span>
       </div>
     </header>
 
@@ -216,7 +226,10 @@ async function onSubmit() {
       </p>
     </main>
 
-    <p class="auth-foot">校园运动打卡 · 让坚持有迹可循</p>
+    <p class="auth-foot">
+      <Footprints :size="18" class="auth-foot__icon" aria-hidden="true" />
+      校园运动打卡 · 让坚持有迹可循
+    </p>
 
     <transition name="ui">
       <div v-if="docOpen" class="doc-overlay" @click.self="docOpen = false">
@@ -245,81 +258,178 @@ async function onSubmit() {
 
 <style scoped>
 .auth {
+  position: relative;
   min-height: 100vh;
-  padding: 0 20px calc(28px + env(safe-area-inset-bottom));
-  background: var(--bg);
+  padding: 0 0 calc(28px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, #e9f4ff 0%, #f3f9ff 38%, #eaf4ff 100%);
   overflow: hidden;
 }
 
 .auth-hero {
-  padding: 40px 4px 20px;
-}
-
-.auth-brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.auth-logo {
-  width: 52px;
-  height: 52px;
-  flex: 0 0 auto;
-  border-radius: 16px;
-  box-shadow: 0 10px 24px rgba(47, 107, 255, 0.28);
+  position: relative;
 }
 
 .auth-illustration {
   display: block;
   width: 100%;
-  margin: 20px 0 4px;
+  height: auto;
+}
+
+.auth-hero__fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  height: 72px;
+  background: linear-gradient(to bottom, rgba(243, 249, 255, 0), #f3f9ff 92%);
+  pointer-events: none;
+}
+
+.auth-brand {
+  position: absolute;
+  top: calc(26px + env(safe-area-inset-top));
+  left: 20px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 40px);
+}
+
+.auth-logo {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  border-radius: 16px;
+  box-shadow: 0 10px 22px rgba(47, 107, 255, 0.3);
 }
 
 .auth-hero h1 {
   margin: 0;
-  font-size: 28px;
-  line-height: 34px;
+  font-size: 30px;
+  line-height: 36px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  color: #0f172a;
 }
 
 .auth-hero p {
   margin: 2px 0 0;
   font-size: 13px;
-  color: var(--text-2);
+  line-height: 18px;
+  color: #475569;
+}
+
+.auth-hero p span {
+  border-bottom: 2px solid rgba(246, 178, 27, 0.85);
+  padding-bottom: 1px;
 }
 
 .auth-tags {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: -18px;
+  padding: 0 20px;
+}
+
+.auth-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 13px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 20px rgba(47, 107, 255, 0.14);
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.auth-tag--blue {
+  background: linear-gradient(135deg, #2f6bff, #5b8cff);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(47, 107, 255, 0.32);
+}
+
+.auth-tag--yellow svg {
+  color: var(--yellow);
+}
+
+.auth-tag--green svg {
+  color: var(--green);
 }
 
 .auth-card {
   position: relative;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 24px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  z-index: 1;
+  margin: 18px 16px 0;
+  padding: 20px;
+  border: 0;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 20px 45px rgba(47, 107, 255, 0.12);
 }
 
 .auth-tabs {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #f1f5fb;
+}
+
+.auth-tabs button {
+  height: 44px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.auth-tabs button.active {
+  background: #fff;
+  color: var(--blue);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.auth-card .form-card {
+  display: grid;
+  gap: 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
 }
 
 .auth-row {
-  padding: 13px 14px;
+  min-height: 56px;
+  padding: 0 16px;
+  border: 1px solid #e8eef7;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+}
+
+.auth-row + .auth-row {
+  border-top: 0;
 }
 
 .auth-row__icon {
   flex: 0 0 auto;
-  color: var(--muted);
+  color: #94a3b8;
 }
 
 .auth-row input {
   text-align: left;
+  font-size: 15px;
   font-weight: 400;
 }
 
@@ -330,7 +440,7 @@ async function onSubmit() {
   border: 0;
   background: transparent;
   padding: 0;
-  color: var(--muted);
+  color: #94a3b8;
   cursor: pointer;
 }
 
@@ -338,11 +448,16 @@ async function onSubmit() {
   margin: 10px 4px 0;
   font-size: 12px;
   line-height: 18px;
-  color: var(--muted);
+  color: #64748b;
 }
 
 .auth-submit {
+  height: 52px;
   margin-top: 18px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #2f6bff, #5b8cff);
+  box-shadow: 0 14px 28px rgba(47, 107, 255, 0.28);
+  font-size: 16px;
 }
 
 .auth-switch {
@@ -363,10 +478,20 @@ async function onSubmit() {
 }
 
 .auth-foot {
-  margin: 22px 0 0;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 24px 16px 0;
   text-align: center;
   font-size: 11px;
-  color: var(--muted);
+  color: #64748b;
+}
+
+.auth-foot__icon {
+  color: #94a3b8;
 }
 
 .doc-link {

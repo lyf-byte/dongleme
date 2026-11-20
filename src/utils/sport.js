@@ -13,10 +13,10 @@ export const SPORTS = [
   { name: '跑步', met: 8.0, icon: Footprints },
   { name: '快走', met: 4.3, icon: Wind },
   { name: '骑行', met: 7.5, icon: Bike },
-  { name: '跳绳', met: 12.3, icon: Zap },
+  { name: '羽毛球', met: 5.5, icon: Feather },
   { name: '游泳', met: 6.0, icon: Waves },
   { name: '力量训练', met: 5.5, icon: Dumbbell },
-  { name: '羽毛球', met: 5.5, icon: Feather }
+  { name: '跳绳', met: 12.3, icon: Zap }
 ]
 
 export const INTENSITY_PRESETS = [

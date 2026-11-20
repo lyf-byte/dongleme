@@ -15,10 +15,17 @@ const routes = [
   },
   { path: '/', name: 'home', component: () => import('../pages/Home.vue') },
   { path: '/checkin', name: 'checkin', component: () => import('../pages/Checkin.vue') },
+  { path: '/track', name: 'track', component: () => import('../pages/Track.vue') },
+  {
+    path: '/track/:id',
+    name: 'track-detail',
+    component: () => import('../pages/TrackDetail.vue')
+  },
   { path: '/stats', name: 'stats', component: () => import('../pages/Stats.vue') },
   { path: '/rank', name: 'rank', component: () => import('../pages/Rank.vue') },
   { path: '/summary', name: 'summary', component: () => import('../pages/Summary.vue') },
   { path: '/mine', name: 'mine', component: () => import('../pages/Mine.vue') },
+  { path: '/settings', name: 'settings', component: () => import('../pages/Settings.vue') },
   {
     path: '/admin/login',
     name: 'admin-login',

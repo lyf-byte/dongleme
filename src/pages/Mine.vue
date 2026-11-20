@@ -5,18 +5,16 @@ import {
   Award,
   ChevronRight,
   Clock3,
-  Download,
   Flame,
-  Lock,
-  LogOut,
+  Route as RouteIcon,
+  Settings,
   Sparkles,
-  Trash2,
   Trophy
 } from 'lucide-vue-next'
-import { getProfile, updateProfile, clearRecords, clearApiCache, errorMessage } from '../utils/api'
-import { getUser, signOut, changePassword } from '../utils/auth'
-import { todayShanghai } from '../utils/sport'
-import { toast, confirmDialog } from '../utils/ui'
+import { getProfile, updateProfile, errorMessage } from '../utils/api'
+import { getUser } from '../utils/auth'
+import { avatarFor } from '../utils/avatar'
+import { toast } from '../utils/ui'
 
 const router = useRouter()
 
@@ -34,6 +32,7 @@ const genders = [
 ]
 
 const avatarText = computed(() => (profile.value?.nickname || '动').slice(0, 1))
+const avatarSrc = computed(() => avatarFor(profile.value?.gender))
 
 const totals = computed(() => [
   { label: '总打卡', value: profile.value?.total?.count || 0, unit: '次' },
@@ -46,15 +45,34 @@ const achievements = computed(() => {
   const count = profile.value?.total?.count || 0
   const minutes = profile.value?.total?.minutes || 0
   return [
-    { label: '初次打卡', desc: '完成第 1 次运动', earned: count >= 1, icon: Sparkles },
-    { label: '连续 3 天', desc: '坚持三天', earned: streak >= 3, icon: Flame },
-    { label: '连续 7 天', desc: '坚持一周', earned: streak >= 7, icon: Flame },
-    { label: '连续 30 天', desc: '坚持一个月', earned: streak >= 30, icon: Trophy },
-    { label: '打卡 10 次', desc: '累计十次运动', earned: count >= 10, icon: Award },
-    { label: '运动 1000 分钟', desc: '累计时长', earned: minutes >= 1000, icon: Clock3 }
+    {
+      label: '初次打卡', desc: '完成第 1 次运动', earned: count >= 1,
+      current: Math.min(count, 1), target: 1, unit: '次', icon: Sparkles
+    },
+    {
+      label: '连续 3 天', desc: '坚持三天', earned: streak >= 3,
+      current: Math.min(streak, 3), target: 3, unit: '天', icon: Flame
+    },
+    {
+      label: '连续 7 天', desc: '坚持一周', earned: streak >= 7,
+      current: Math.min(streak, 7), target: 7, unit: '天', icon: Flame
+    },
+    {
+      label: '连续 30 天', desc: '坚持一个月', earned: streak >= 30,
+      current: Math.min(streak, 30), target: 30, unit: '天', icon: Trophy
+    },
+    {
+      label: '打卡 10 次', desc: '累计十次运动', earned: count >= 10,
+      current: Math.min(count, 10), target: 10, unit: '次', icon: Award
+    },
+    {
+      label: '运动 1000 分钟', desc: '累计时长', earned: minutes >= 1000,
+      current: Math.min(minutes, 1000), target: 1000, unit: '分钟', icon: Clock3
+    }
   ]
 })
 const earnedCount = computed(() => achievements.value.filter((item) => item.earned).length)
+const activeBadge = ref(null)
 
 async function load() {
   loading.value = true
@@ -117,103 +135,6 @@ async function save() {
   }
 }
 
-async function exportData() {
-  try {
-    const data = await getProfile({ export: 1 })
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `dongleme-${todayShanghai()}.json`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    toast('已导出')
-  } catch (error) {
-    toast(errorMessage(error, '导出失败'))
-  }
-}
-
-async function clearAll() {
-  try {
-    await confirmDialog({
-      title: '清空所有数据',
-      message: '将删除全部打卡记录与 AI 小结，连续打卡也会归零，且无法恢复。',
-      confirmText: '清空',
-      cancelText: '取消',
-      danger: true
-    })
-  } catch {
-    return
-  }
-
-  try {
-    await clearRecords()
-    await load()
-    toast('已清空')
-  } catch (error) {
-    toast(errorMessage(error, '清空失败'))
-  }
-}
-
-async function logout() {
-  try {
-    await confirmDialog({
-      title: '退出登录',
-      message: '退出后需要重新输入账号密码。',
-      confirmText: '退出',
-      cancelText: '取消'
-    })
-  } catch {
-    return
-  }
-  try {
-    clearApiCache()
-    signOut()
-  } finally {
-    router.replace('/auth')
-  }
-}
-
-const pwdOpen = ref(false)
-const pwdSaving = ref(false)
-const pwdError = ref('')
-const pwdForm = ref({ oldPassword: '', newPassword: '', confirm: '' })
-
-function togglePassword() {
-  pwdOpen.value = !pwdOpen.value
-  pwdError.value = ''
-}
-
-async function savePassword() {
-  pwdError.value = ''
-  if (!pwdForm.value.oldPassword) {
-    pwdError.value = '请输入原密码'
-    return
-  }
-  if (pwdForm.value.newPassword.length < 6) {
-    pwdError.value = '新密码至少 6 位'
-    return
-  }
-  if (pwdForm.value.newPassword !== pwdForm.value.confirm) {
-    pwdError.value = '两次输入的新密码不一致'
-    return
-  }
-
-  pwdSaving.value = true
-  try {
-    await changePassword(pwdForm.value.oldPassword, pwdForm.value.newPassword)
-    pwdForm.value = { oldPassword: '', newPassword: '', confirm: '' }
-    pwdOpen.value = false
-    toast('密码已修改')
-  } catch (error) {
-    pwdError.value = errorMessage(error, '修改密码失败')
-  } finally {
-    pwdSaving.value = false
-  }
-}
-
 onMounted(load)
 </script>
 
@@ -224,6 +145,14 @@ onMounted(load)
         <p class="eyebrow">账号与设置</p>
         <h1>我的</h1>
       </div>
+      <button
+        type="button"
+        class="nav-large__action"
+        aria-label="设置"
+        @click="router.push('/settings')"
+      >
+        <Settings :size="20" />
+      </button>
     </header>
 
     <template v-if="loading">
@@ -235,7 +164,8 @@ onMounted(load)
     <template v-else>
       <section class="card profile-card">
         <div class="profile-main">
-          <div class="avatar profile-avatar">{{ avatarText }}</div>
+          <img v-if="avatarSrc" :src="avatarSrc" alt="" class="avatar profile-avatar" />
+          <div v-else class="avatar profile-avatar">{{ avatarText }}</div>
           <div class="profile-text">
             <h2>{{ profile?.nickname || '运动新人' }}</h2>
             <p>{{ account }}</p>
@@ -254,23 +184,60 @@ onMounted(load)
         </div>
       </div>
 
+      <div class="list-card route-entry">
+        <button type="button" class="list-row" @click="router.push('/track')">
+          <span class="list-icon list-icon--blue"><RouteIcon :size="18" /></span>
+          <span class="list-text">
+            <strong>运动轨迹</strong>
+            <small>查看跑步、快走、骑行记录</small>
+          </span>
+          <ChevronRight :size="18" class="chev" />
+        </button>
+      </div>
+
       <div class="section-title">
         <h2>成就徽章</h2>
         <span>{{ earnedCount }} / {{ achievements.length }}</span>
       </div>
 
       <div class="badge-grid">
-        <div
+        <button
           v-for="badge in achievements"
           :key="badge.label"
+          type="button"
           class="badge-card"
           :class="{ earned: badge.earned }"
+          @click="activeBadge = badge"
         >
           <span class="badge-icon"><component :is="badge.icon" :size="18" /></span>
           <strong>{{ badge.label }}</strong>
-          <small>{{ badge.desc }}</small>
-        </div>
+          <small>
+            {{ badge.earned ? badge.desc : `${badge.current} / ${badge.target} ${badge.unit}` }}
+          </small>
+        </button>
       </div>
+
+      <transition name="ui">
+        <div v-if="activeBadge" class="badge-overlay" @click.self="activeBadge = null">
+          <div class="badge-sheet" role="dialog" aria-modal="true" :aria-label="activeBadge.label">
+            <span class="badge-sheet__icon" :class="{ earned: activeBadge.earned }">
+              <component :is="activeBadge.icon" :size="26" />
+            </span>
+            <strong>{{ activeBadge.label }}</strong>
+            <p>{{ activeBadge.desc }}</p>
+            <div class="badge-sheet__bar">
+              <i :style="{ width: Math.round((activeBadge.current / activeBadge.target) * 100) + '%' }"></i>
+            </div>
+            <span class="badge-sheet__progress">
+              {{ activeBadge.current }} / {{ activeBadge.target }} {{ activeBadge.unit }}
+              {{ activeBadge.earned ? '· 已获得' : '' }}
+            </span>
+            <button type="button" class="btn-primary btn-sm" @click="activeBadge = null">
+              知道了
+            </button>
+          </div>
+        </div>
+      </transition>
 
       <div class="section-title">
         <h2>基础资料</h2>
@@ -313,82 +280,6 @@ onMounted(load)
       <button type="button" class="btn-primary save-btn" :disabled="saving" @click="save">
         {{ saving ? '保存中…' : '保存修改' }}
       </button>
-
-      <div class="section-title">
-        <h2>账号安全</h2>
-      </div>
-
-      <div class="list-card">
-        <button type="button" class="list-row" @click="togglePassword">
-          <span class="list-icon list-icon--blue"><Lock :size="18" /></span>
-          <span class="list-text">
-            <strong>修改密码</strong>
-            <small>定期更换更安全</small>
-          </span>
-          <ChevronRight :size="18" class="chev" />
-        </button>
-      </div>
-
-      <template v-if="pwdOpen">
-        <div class="form-card">
-          <div class="form-row">
-            <span class="form-row__label">原密码</span>
-            <input v-model="pwdForm.oldPassword" type="password" autocomplete="current-password" />
-          </div>
-          <div class="form-row">
-            <span class="form-row__label">新密码</span>
-            <input
-              v-model="pwdForm.newPassword"
-              type="password"
-              autocomplete="new-password"
-              placeholder="至少 6 位"
-            />
-          </div>
-          <div class="form-row">
-            <span class="form-row__label">确认</span>
-            <input
-              v-model="pwdForm.confirm"
-              type="password"
-              autocomplete="new-password"
-              placeholder="再次输入新密码"
-            />
-          </div>
-        </div>
-        <p v-if="pwdError" class="form-error">{{ pwdError }}</p>
-        <button type="button" class="btn-primary save-btn" :disabled="pwdSaving" @click="savePassword">
-          {{ pwdSaving ? '保存中…' : '确认修改' }}
-        </button>
-      </template>
-
-      <div class="section-title">
-        <h2>数据管理</h2>
-      </div>
-
-      <div class="list-card">
-        <button type="button" class="list-row" @click="exportData">
-          <span class="list-icon list-icon--blue"><Download :size="18" /></span>
-          <span class="list-text">
-            <strong>导出数据</strong>
-            <small>JSON 格式，包含打卡记录与小结</small>
-          </span>
-          <ChevronRight :size="18" class="chev" />
-        </button>
-        <button type="button" class="list-row" @click="clearAll">
-          <span class="list-icon list-icon--red"><Trash2 :size="18" /></span>
-          <span class="list-text">
-            <strong class="red">清空数据</strong>
-            <small>删除全部记录并重置连续天数</small>
-          </span>
-          <ChevronRight :size="18" class="chev" />
-        </button>
-      </div>
-
-      <button type="button" class="logout" @click="logout">
-        <LogOut :size="16" />
-        退出登录
-      </button>
-
-      <p class="version">动了么 · v1.0.0</p>
     </template>
   </div>
 </template>
@@ -472,6 +363,10 @@ onMounted(load)
   border-radius: 18px;
 }
 
+.route-entry {
+  margin-top: 12px;
+}
+
 .stat {
   padding: 0 14px;
 }
@@ -548,7 +443,13 @@ onMounted(load)
   border-radius: 16px;
   background: var(--surface);
   text-align: center;
+  font-family: inherit;
+  cursor: pointer;
   opacity: 0.55;
+}
+
+.badge-card:active {
+  transform: scale(0.97);
 }
 
 .badge-card.earned {
@@ -583,6 +484,81 @@ onMounted(load)
   font-size: 10px;
   line-height: 14px;
   color: var(--muted);
+}
+
+.badge-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.45);
+  padding: 24px;
+}
+
+.badge-sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 320px;
+  border-radius: 22px;
+  background: #fff;
+  padding: 24px 20px 18px;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+}
+
+.badge-sheet__icon {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 20px;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.badge-sheet__icon.earned {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.badge-sheet strong {
+  font-size: 17px;
+}
+
+.badge-sheet p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.badge-sheet__bar {
+  width: 100%;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.badge-sheet__bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--blue);
+}
+
+.badge-sheet__progress {
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.badge-sheet .btn-sm {
+  width: 100%;
+  margin-top: 8px;
 }
 
 .list-card {
@@ -628,11 +604,6 @@ onMounted(load)
   color: var(--blue);
 }
 
-.list-icon--red {
-  background: var(--red-soft);
-  color: var(--red);
-}
-
 .list-text {
   min-width: 0;
 }
@@ -644,10 +615,6 @@ onMounted(load)
   font-weight: 500;
 }
 
-.list-text strong.red {
-  color: var(--red);
-}
-
 .list-text small {
   display: block;
   margin-top: 2px;
@@ -657,30 +624,6 @@ onMounted(load)
 }
 
 .chev {
-  color: var(--muted);
-}
-
-.logout {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  height: 48px;
-  margin-top: 20px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface);
-  color: var(--red);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.version {
-  margin: 16px 0 0;
-  text-align: center;
-  font-size: 11px;
   color: var(--muted);
 }
 </style>

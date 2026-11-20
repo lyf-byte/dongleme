@@ -1,8 +1,9 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { MapPin, RefreshCw } from 'lucide-vue-next'
+import { MapPin, RefreshCw, ChevronDown, ChevronUp } from 'lucide-vue-next'
 import { getWeather, errorMessage } from '../utils/api'
+import { wgs84ToGcj02 } from '../utils/coord'
 
 const CACHE_KEY = 'dlm_weather_cache'
 const CACHE_TTL = 15 * 60 * 1000
@@ -12,6 +13,7 @@ const emit = defineEmits(['theme'])
 const state = ref('loading')
 const weather = ref(null)
 const errorText = ref('')
+const detailOpen = ref(true)
 
 const current = computed(() => weather.value?.current || {})
 const air = computed(() => weather.value?.air || {})
@@ -125,7 +127,8 @@ function load() {
   navigator.geolocation.getCurrentPosition(
     async (position) => {
       try {
-        const data = await getWeather(position.coords.latitude, position.coords.longitude)
+        const gcj = wgs84ToGcj02(position.coords.longitude, position.coords.latitude)
+        const data = await getWeather(gcj.lat, gcj.lng)
         weather.value = data
         saveCache(data)
         state.value = 'ready'
@@ -191,22 +194,36 @@ onMounted(() => {
       <span>{{ advice.summary }}</span>
     </div>
 
-    <div class="wi-sports">
-      <button
-        v-for="sport in sports"
-        :key="sport.type"
-        type="button"
-        :title="sport.reason"
-        @click="goCheckin(sport.type)"
-      >
-        {{ sport.type }}
-      </button>
-    </div>
+    <button
+      v-if="sports.length || daily.length"
+      type="button"
+      class="wi-more"
+      :aria-expanded="detailOpen"
+      @click="detailOpen = !detailOpen"
+    >
+      {{ detailOpen ? '收起天气详情' : '天气详情 · 运动推荐' }}
+      <ChevronUp v-if="detailOpen" :size="12" />
+      <ChevronDown v-else :size="12" />
+    </button>
 
-    <div v-if="daily.length" class="wi-daily">
-      <span v-for="day in daily" :key="day.date">
-        {{ dayLabel(day.date) }} {{ day.condition }} {{ day.max }}°/{{ day.min }}°
-      </span>
+    <div v-if="detailOpen" class="wi-detail">
+      <div v-if="sports.length" class="wi-sports">
+        <button
+          v-for="sport in sports"
+          :key="sport.type"
+          type="button"
+          :title="sport.reason"
+          @click="goCheckin(sport.type)"
+        >
+          {{ sport.type }}
+        </button>
+      </div>
+
+      <div v-if="daily.length" class="wi-daily">
+        <span v-for="day in daily" :key="day.date">
+          {{ dayLabel(day.date) }} {{ day.condition }} {{ day.max }}°/{{ day.min }}°
+        </span>
+      </div>
     </div>
   </div>
 
@@ -270,7 +287,7 @@ onMounted(() => {
   align-items: center;
   gap: 3px;
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.82);
+  color: rgba(255, 255, 255, 0.9);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -278,7 +295,7 @@ onMounted(() => {
 
 .wi-meta {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.66);
+  color: rgba(255, 255, 255, 0.76);
 }
 
 .wi-badges {
@@ -295,7 +312,7 @@ onMounted(() => {
   height: 21px;
   padding: 0 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.2);
   font-size: 10px;
   font-weight: 500;
   white-space: nowrap;
@@ -360,6 +377,23 @@ onMounted(() => {
   background: rgba(239, 68, 68, 0.72);
 }
 
+.wi-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.wi-detail {
+  margin-top: 2px;
+}
+
 .wi-sports {
   display: flex;
   flex-wrap: wrap;
@@ -389,7 +423,7 @@ onMounted(() => {
   gap: 4px 12px;
   margin-top: 10px;
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .weather-inline--state {

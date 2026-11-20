@@ -13,19 +13,19 @@ import java.util.List;
 public interface UserMapper extends BaseMapper<User> {
 
     @Select("""
-            select u.id, u.nickname, coalesce(sum(r.duration), 0) as weekly_minutes
+            select u.id, u.nickname, u.gender, coalesce(sum(r.duration), 0) as weekly_minutes
             from users u
             join records r on r.user_id = u.id and r.date >= #{weekStart}
-            group by u.id, u.nickname
+            group by u.id, u.nickname, u.gender
             order by weekly_minutes desc, u.nickname asc
             """)
     List<RankRow> selectWeeklyRank(@Param("weekStart") LocalDate weekStart);
 
     @Select("""
-            select u.id, u.nickname, coalesce(sum(r.duration), 0) as weekly_minutes
+            select u.id, u.nickname, u.gender, coalesce(sum(r.duration), 0) as weekly_minutes
             from users u
             join records r on r.user_id = u.id
-            group by u.id, u.nickname
+            group by u.id, u.nickname, u.gender
             order by weekly_minutes desc, u.nickname asc
             """)
     List<RankRow> selectTotalRank();
@@ -45,7 +45,7 @@ public interface UserMapper extends BaseMapper<User> {
                  or u.username like concat('%', #{query}, '%'))
               </if>
             </where>
-            group by u.id, u.nickname, u.weight, u.weekly_goal, u.streak,
+            group by u.id, u.nickname, u.gender, u.weight, u.weekly_goal, u.streak,
                      u.is_admin, u.created_at, u.email, u.phone, u.username
             order by u.created_at desc
             limit #{limit} offset #{offset}

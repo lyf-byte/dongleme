@@ -41,7 +41,7 @@ public class RankService {
             if (isMe) {
                 meIndex = index;
             }
-            all.add(new RankItem(row.getId(), nickname, minutes, isMe));
+            all.add(new RankItem(row.getId(), nickname, row.getGender(), minutes, isMe));
         }
 
         RankMe me = null;

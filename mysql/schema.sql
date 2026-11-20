@@ -67,3 +67,31 @@ CREATE TABLE IF NOT EXISTS custom_sports (
   CONSTRAINT fk_custom_sports_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
   CONSTRAINT chk_custom_sports_met CHECK (met BETWEEN 1 AND 20)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS activity_routes (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  date DATE NOT NULL,
+  type VARCHAR(20) NOT NULL,
+  started_at DATETIME NOT NULL,
+  ended_at DATETIME NOT NULL,
+  duration_sec INT NOT NULL,
+  distance_m INT NOT NULL,
+  calories INT NOT NULL,
+  point_count INT NOT NULL,
+  points LONGTEXT NOT NULL,
+  preview TEXT NULL,
+  start_lat DECIMAL(10, 7) NULL,
+  start_lng DECIMAL(10, 7) NULL,
+  end_lat DECIMAL(10, 7) NULL,
+  end_lng DECIMAL(10, 7) NULL,
+  client_id CHAR(36) NOT NULL,
+  source VARCHAR(16) NOT NULL DEFAULT 'web',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_routes_user_client (user_id, client_id),
+  KEY idx_routes_user_date (user_id, date),
+  KEY idx_routes_user_created (user_id, created_at),
+  CONSTRAINT fk_routes_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT chk_routes_duration CHECK (duration_sec BETWEEN 60 AND 21600),
+  CONSTRAINT chk_routes_distance CHECK (distance_m >= 0)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;

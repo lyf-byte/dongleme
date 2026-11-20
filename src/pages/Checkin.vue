@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Check, Minus, Plus, Settings2 } from 'lucide-vue-next'
+import { ArrowLeft, Check, Download, Minus, Navigation, Plus, Settings2 } from 'lucide-vue-next'
 import { getProfile, getCustomSports, submitCheckin, errorMessage } from '../utils/api'
 import { SPORTS, calcCalories, mergeSports } from '../utils/sport'
 import { toast, confirmDialog } from '../utils/ui'
@@ -23,7 +23,9 @@ const form = ref({
   weight: 60
 })
 const gender = ref('secret')
+const todayTypes = ref([])
 const submitting = ref(false)
+const success = ref(null)
 
 const currentSport = computed(
   () => allSports.value.find((sport) => sport.name === form.value.type) || allSports.value[0]
@@ -48,6 +50,7 @@ async function loadProfile() {
     const profile = await getProfile()
     if (profile?.weight) form.value.weight = profile.weight
     gender.value = profile?.gender || 'secret'
+    todayTypes.value = profile?.today?.types || []
   } catch {
     /* 保留默认体重 */
   }
@@ -94,8 +97,14 @@ async function submit(overwrite = false) {
       weight,
       overwrite
     })
-    toast(`打卡成功 · ${result.calories} 千卡`)
-    setTimeout(() => router.replace('/'), 500)
+    todayTypes.value = Array.from(new Set([...todayTypes.value, form.value.type]))
+    success.value = {
+      type: form.value.type,
+      duration,
+      calories: result.calories,
+      streak: result.streak,
+      date: result.date
+    }
   } catch (error) {
     if (error?.response?.status === 409 && !overwrite) {
       try {
@@ -115,6 +124,109 @@ async function submit(overwrite = false) {
   } finally {
     submitting.value = false
   }
+}
+
+function finishSuccess() {
+  success.value = null
+  router.replace('/')
+}
+
+function saveSuccessPoster() {
+  if (!success.value) return
+  const data = success.value
+  const canvas = document.createElement('canvas')
+  const width = 620
+  const height = 880
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    toast('当前浏览器不支持生成海报')
+    return
+  }
+
+  const background = ctx.createLinearGradient(0, 0, width, height)
+  background.addColorStop(0, '#2f6bff')
+  background.addColorStop(1, '#16337f')
+  ctx.fillStyle = background
+  ctx.fillRect(0, 0, width, height)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'
+  ctx.beginPath()
+  ctx.arc(540, 140, 170, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(70, 790, 130, 0, Math.PI * 2)
+  ctx.fill()
+
+  const font = "'PingFang SC', 'Microsoft YaHei', sans-serif"
+  ctx.fillStyle = 'rgba(255,255,255,0.78)'
+  ctx.font = `26px ${font}`
+  ctx.fillText('动了么 · 每日打卡', 52, 86)
+
+  ctx.fillStyle = '#ffffff'
+  ctx.font = `bold 64px ${font}`
+  ctx.fillText('打卡成功', 52, 182)
+
+  const dateText = String(data.date || '').slice(5).replace('-', '月') + '日'
+  ctx.fillStyle = 'rgba(255,255,255,0.82)'
+  ctx.font = `30px ${font}`
+  ctx.fillText(`${data.type} · ${dateText}`, 52, 232)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.12)'
+  if (typeof ctx.roundRect === 'function') {
+    ctx.beginPath()
+    ctx.roundRect(44, 300, width - 88, 250, 30)
+    ctx.fill()
+  } else {
+    ctx.fillRect(44, 300, width - 88, 250)
+  }
+
+  const metrics = [
+    { label: '运动时长', value: data.duration, unit: '分钟' },
+    { label: '消耗热量', value: data.calories, unit: '千卡' },
+    { label: '连续打卡', value: data.streak, unit: '天' }
+  ]
+  metrics.forEach((metric, index) => {
+    const x = 76 + index * 170
+    ctx.fillStyle = 'rgba(255,255,255,0.66)'
+    ctx.font = `24px ${font}`
+    ctx.fillText(metric.label, x, 360)
+    ctx.fillStyle = '#ffffff'
+    ctx.font = `bold 58px ${font}`
+    ctx.fillText(String(metric.value), x, 438)
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'
+    ctx.font = `24px ${font}`
+    ctx.fillText(metric.unit, x, 480)
+  })
+
+  ctx.fillStyle = 'rgba(255,255,255,0.28)'
+  ctx.font = `28px ${font}`
+  ctx.fillText('每天动一点，连续看得见', 52, 650)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.16)'
+  ctx.beginPath()
+  ctx.arc(310, 748, 54, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#ffffff'
+  ctx.font = `bold 42px ${font}`
+  ctx.fillText('动', 291, 764)
+
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      toast('海报生成失败')
+      return
+    }
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `dongleme-checkin-${data.date || 'today'}.png`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    toast('打卡海报已保存')
+  }, 'image/png')
 }
 
 onMounted(() => {
@@ -144,6 +256,15 @@ onMounted(() => {
       </div>
     </section>
 
+    <button
+      type="button"
+      class="track-entry"
+      @click="router.push({ path: '/track', query: { type: form.type } })"
+    >
+      <Navigation :size="16" />
+      用 GPS 记录轨迹
+    </button>
+
     <div class="section-title">
       <h2>运动类型</h2>
       <button type="button" class="manage-btn" @click="managerOpen = true">
@@ -157,7 +278,7 @@ onMounted(() => {
         v-for="(sport, index) in allSports"
         :key="sport.custom ? `custom-${sport.id}` : sport.name"
         type="button"
-        :class="{ active: form.type === sport.name }"
+        :class="{ active: form.type === sport.name, 'is-done': todayTypes.includes(sport.name) }"
         :aria-pressed="form.type === sport.name"
         @click="form.type = sport.name"
       >
@@ -168,9 +289,14 @@ onMounted(() => {
           <component :is="sport.icon" :size="16" />
         </span>
         <span class="type-name">{{ sport.name }}</span>
-        <span class="type-met">MET {{ sport.met.toFixed(1) }}</span>
+        <span class="type-met" :class="{ done: todayTypes.includes(sport.name) }">
+          {{ todayTypes.includes(sport.name) ? '今日已打卡' : `MET ${sport.met.toFixed(1)}` }}
+        </span>
         <span v-if="form.type === sport.name" class="type-check">
           <Check :size="12" />
+        </span>
+        <span v-else-if="todayTypes.includes(sport.name)" class="type-done">
+          <Check :size="10" />
         </span>
       </button>
     </div>
@@ -210,6 +336,37 @@ onMounted(() => {
     </button>
 
     <CustomSportManager v-model="managerOpen" @changed="handleSportsChanged" />
+
+    <transition name="ui">
+      <div v-if="success" class="checkin-overlay" @click.self="finishSuccess">
+        <div class="checkin-sheet" role="dialog" aria-modal="true" aria-label="打卡成功">
+          <span class="success-check"><Check :size="26" /></span>
+          <h2>打卡成功</h2>
+          <p>{{ success.type }} · {{ success.duration }} 分钟</p>
+
+          <div class="success-stats">
+            <div>
+              <strong>{{ success.duration }}</strong>
+              <span>分钟</span>
+            </div>
+            <div>
+              <strong>{{ success.calories }}</strong>
+              <span>千卡</span>
+            </div>
+            <div>
+              <strong>{{ success.streak }}</strong>
+              <span>连续天数</span>
+            </div>
+          </div>
+
+          <button type="button" class="btn-primary success-poster" @click="saveSuccessPoster">
+            <Download :size="16" />
+            保存打卡海报
+          </button>
+          <button type="button" class="success-done" @click="finishSuccess">完成</button>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -227,6 +384,22 @@ onMounted(() => {
   border: 0;
   border-radius: 20px;
   background: var(--blue-soft);
+}
+
+.track-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 44px;
+  margin-top: 10px;
+  border: 1px dashed rgba(47, 107, 255, 0.35);
+  border-radius: 14px;
+  background: rgba(47, 107, 255, 0.06);
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .selected-icon {
@@ -284,8 +457,8 @@ onMounted(() => {
 
 .type-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }
 
 .type-grid button {
@@ -293,10 +466,10 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
-  padding: 12px;
+  gap: 3px;
+  padding: 10px 9px;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 14px;
   background: var(--surface);
   text-align: left;
   cursor: pointer;
@@ -309,16 +482,21 @@ onMounted(() => {
   box-shadow: inset 0 0 0 1px var(--blue);
 }
 
+.type-grid button.is-done:not(.active) {
+  border-color: rgba(22, 163, 74, 0.28);
+  background: #f4fbf6;
+}
+
 .type-grid button:active {
   transform: scale(0.98);
 }
 
 .type-icon {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
+  border-radius: 9px;
   font-size: 13px;
   font-weight: 700;
 }
@@ -378,7 +556,7 @@ onMounted(() => {
 }
 
 .type-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text);
 }
@@ -388,16 +566,34 @@ onMounted(() => {
   color: var(--muted);
 }
 
+.type-met.done {
+  color: var(--green);
+  font-weight: 600;
+}
+
 .type-check {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 18px;
-  height: 18px;
+  top: 8px;
+  right: 8px;
+  width: 16px;
+  height: 16px;
   display: grid;
   place-items: center;
   border-radius: 50%;
   background: var(--blue);
+  color: #fff;
+}
+
+.type-done {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--green);
   color: #fff;
 }
 
@@ -456,5 +652,100 @@ onMounted(() => {
 
 .checkin-submit {
   margin-top: 20px;
+}
+
+.checkin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  background: rgba(15, 23, 42, 0.48);
+  padding: 24px;
+}
+
+.checkin-sheet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 330px;
+  border-radius: 24px;
+  background: #fff;
+  padding: 26px 20px 16px;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.26);
+}
+
+.success-check {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: rgba(22, 163, 74, 0.12);
+  color: var(--green);
+}
+
+.checkin-sheet h2 {
+  margin: 12px 0 0;
+  color: var(--text);
+  font-size: 21px;
+}
+
+.checkin-sheet > p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.success-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  width: 100%;
+  margin-top: 18px;
+  border-radius: 16px;
+  background: #f8fafc;
+  padding: 12px 0;
+}
+
+.success-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.success-stats > div + div {
+  border-left: 1px solid var(--line);
+}
+
+.success-stats strong {
+  color: var(--text);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.success-stats span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.success-poster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 18px;
+}
+
+.success-done {
+  width: 100%;
+  margin-top: 6px;
+  border: 0;
+  background: transparent;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 13px;
 }
 </style>

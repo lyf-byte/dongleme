@@ -38,20 +38,6 @@ public class CheckinService {
 
     @Transactional
     public CheckinResult checkin(String userId, CheckinRequest request) {
-        String type = request.type() == null ? "" : request.type();
-        Double met = Sports.BUILTIN_MET.get(type);
-        if (met == null) {
-            CustomSport customSport = customSportMapper.selectOne(
-                    Wrappers.<CustomSport>lambdaQuery()
-                            .eq(CustomSport::getUserId, userId)
-                            .eq(CustomSport::getName, type)
-                            .last("limit 1"));
-            if (customSport == null) {
-                throw ApiException.badRequest("运动类型不在可选范围内");
-            }
-            met = customSport.getMet().doubleValue();
-        }
-
         Double durationValue = request.duration();
         if (durationValue == null
                 || !Double.isFinite(durationValue)
@@ -62,32 +48,73 @@ public class CheckinService {
         }
         int duration = durationValue.intValue();
 
+        CheckinOutcome outcome = checkinAt(
+                userId,
+                request.type(),
+                duration,
+                request.weight(),
+                Boolean.TRUE.equals(request.overwrite()),
+                ShanghaiTime.today());
+        CheckinRecord record = outcome.record();
+        return new CheckinResult(
+                record.getDate(),
+                record.getDuration(),
+                record.getCalories(),
+                outcome.streak());
+    }
+
+    /**
+     * 打卡核心逻辑：运动类型/MET、体重、性别系数、ACSM 热量、记录写入和连续天数。
+     * 轨迹保存也调用这里，避免重复实现。
+     */
+    @Transactional
+    public CheckinOutcome checkinAt(
+            String userId,
+            String type,
+            int duration,
+            Double weightOverride,
+            boolean overwrite,
+            LocalDate date) {
+        String normalizedType = type == null ? "" : type;
+        Double met = Sports.BUILTIN_MET.get(normalizedType);
+        if (met == null) {
+            CustomSport customSport = customSportMapper.selectOne(
+                    Wrappers.<CustomSport>lambdaQuery()
+                            .eq(CustomSport::getUserId, userId)
+                            .eq(CustomSport::getName, normalizedType)
+                            .last("limit 1"));
+            if (customSport == null) {
+                throw ApiException.badRequest("运动类型不在可选范围内");
+            }
+            met = customSport.getMet().doubleValue();
+        }
+
         User user = userMapper.selectById(userId);
         if (user == null) {
             throw ApiException.notFound("用户不存在");
         }
 
-        double weight = request.weight() != null
-                ? request.weight()
+        double weight = weightOverride != null
+                ? weightOverride
                 : user.getWeight() != null ? user.getWeight().doubleValue() : 60;
         if (!Double.isFinite(weight) || weight < 20 || weight > 300) {
             throw ApiException.badRequest("体重需在 20–300 kg 之间");
         }
 
-        LocalDate today = ShanghaiTime.today();
+        LocalDate checkinDate = date == null ? ShanghaiTime.today() : date;
         double factor = Sports.genderFactor(user.getGender());
         // ACSM 估算：MET × 3.5 × 体重(kg) ÷ 200 每分钟
         int calories = (int) Math.round(met * 3.5 * weight * duration / 200.0 * factor);
 
         CheckinRecord record = new CheckinRecord();
         record.setUserId(userId);
-        record.setDate(today);
-        record.setType(type);
+        record.setDate(checkinDate);
+        record.setType(normalizedType);
         record.setDuration(duration);
         record.setCalories(calories);
 
         try {
-            if (Boolean.TRUE.equals(request.overwrite())) {
+            if (overwrite) {
                 recordMapper.upsert(record);
             } else {
                 recordMapper.insert(record);
@@ -101,10 +128,10 @@ public class CheckinService {
         int currentStreak = user.getStreak() == null ? 0 : user.getStreak();
         LocalDate lastCheckDate = user.getLastCheckDate();
         int streak = 1;
-        if (today.equals(lastCheckDate)) {
+        if (checkinDate.equals(lastCheckDate)) {
             streak = currentStreak > 0 ? currentStreak : 1;
         } else if (lastCheckDate != null
-                && ChronoUnit.DAYS.between(lastCheckDate, today) == 1) {
+                && ChronoUnit.DAYS.between(lastCheckDate, checkinDate) == 1) {
             streak = currentStreak + 1;
         }
 
@@ -112,12 +139,15 @@ public class CheckinService {
             User patch = new User();
             patch.setId(userId);
             patch.setStreak(streak);
-            patch.setLastCheckDate(today);
+            patch.setLastCheckDate(checkinDate);
             userMapper.updateById(patch);
         } catch (DataAccessException exception) {
             throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "保存打卡记录失败");
         }
 
-        return new CheckinResult(today, duration, calories, streak);
+        return new CheckinOutcome(record, streak);
+    }
+
+    public record CheckinOutcome(CheckinRecord record, int streak) {
     }
 }

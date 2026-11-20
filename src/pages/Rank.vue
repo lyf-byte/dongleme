@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Crown, Trophy } from 'lucide-vue-next'
 import { getRank, errorMessage } from '../utils/api'
+import { avatarFor } from '../utils/avatar'
 import { toast } from '../utils/ui'
 import emptyRank from '../assets/empty-rank.svg'
 
@@ -20,6 +21,11 @@ const list = computed(() => data.value.list || [])
 const meInList = computed(() => list.value.some((item) => item.isMe))
 const showMyCard = computed(() => Boolean(data.value.me) && !meInList.value)
 const isWeek = computed(() => scope.value === 'week')
+const myIndex = computed(() => list.value.findIndex((item) => item.isMe))
+const topGap = computed(() => {
+  if (myIndex.value <= 2 || !list.value[2] || !list.value[myIndex.value]) return null
+  return Math.max(0, list.value[2].weeklyMinutes - list.value[myIndex.value].weeklyMinutes)
+})
 
 function medalClass(index) {
   if (index === 0) return 'gold'
@@ -94,7 +100,7 @@ onMounted(load)
 
       <div class="section-title">
         <h2>{{ isWeek ? '本周榜单' : '累计榜单' }}</h2>
-        <span>TOP 20</span>
+        <span>{{ list.length }} 人参与</span>
       </div>
 
       <div v-if="list.length" class="card rank-list">
@@ -104,9 +110,21 @@ onMounted(load)
           class="rank-row"
           :class="{ me: item.isMe }"
         >
-          <span class="rank-no" :class="medalClass(index)">{{ index + 1 }}</span>
+          <span class="rank-no" :class="medalClass(index)">
+            <template v-if="index < 3">
+              <span class="rank-medal-ribbon"></span>
+              <span class="rank-medal">{{ index + 1 }}</span>
+            </template>
+            <template v-else>{{ index + 1 }}</template>
+          </span>
           <span class="rank-avatar" :class="'rank-avatar--' + (index % 5)">
-            {{ item.nickname.slice(0, 1) }}
+            <img
+              v-if="avatarFor(item.gender)"
+              :src="avatarFor(item.gender)"
+              alt=""
+              class="rank-avatar__img"
+            />
+            <template v-else>{{ item.nickname.slice(0, 1) }}</template>
           </span>
           <span class="rank-name">
             <Crown v-if="index === 0" :size="13" class="rank-crown" />
@@ -115,6 +133,17 @@ onMounted(load)
           </span>
           <span class="rank-min">{{ item.weeklyMinutes }}<em>分钟</em></span>
         </div>
+      </div>
+
+      <div v-if="list.length" class="rank-tip">
+        <Trophy :size="15" />
+        <span v-if="topGap !== null">
+          再运动 <strong>{{ topGap }}</strong> 分钟就能进入前三
+        </span>
+        <span v-else-if="!meInList">完成一次打卡，就能出现在榜单上</span>
+        <span v-else-if="list.length < 3">再完成一次打卡，名次会更稳</span>
+        <span v-else>保持节奏，你已经在榜单前列</span>
+        <button v-if="!meInList" type="button" @click="router.push('/checkin')">去打卡</button>
       </div>
 
       <div v-else class="card empty-state">
@@ -219,9 +248,16 @@ onMounted(load)
   border-top: 0;
 }
 
+.rank-row:nth-child(-n + 3) {
+  margin: 0 -14px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
 .rank-no {
-  width: 24px;
-  height: 24px;
+  position: relative;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -232,19 +268,65 @@ onMounted(load)
   font-variant-numeric: tabular-nums;
 }
 
+.rank-no.gold,
+.rank-no.silver,
+.rank-no.bronze {
+  background: transparent;
+  color: inherit;
+}
+
+.rank-medal {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.14);
+}
+
+.rank-medal-ribbon {
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  z-index: 0;
+  width: 16px;
+  height: 10px;
+  transform: translateX(-50%);
+  background: currentColor;
+  opacity: 0.7;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 62%, 0 100%);
+}
+
 .rank-no.gold {
-  background: var(--yellow-soft);
-  color: #b45309;
+  color: #d9a406;
+}
+
+.rank-no.gold .rank-medal {
+  background: linear-gradient(145deg, #ffeaa6, #f4c33d);
+  color: #7a5200;
 }
 
 .rank-no.silver {
-  background: #f1f5f9;
-  color: #64748b;
+  color: #94a3b8;
+}
+
+.rank-no.silver .rank-medal {
+  background: linear-gradient(145deg, #f4f7fa, #c8d3e1);
+  color: #4b5a6d;
 }
 
 .rank-no.bronze {
-  background: #fbeee3;
-  color: #b25e2a;
+  color: #b87333;
+}
+
+.rank-no.bronze .rank-medal {
+  background: linear-gradient(145deg, #f9dfc8, #e0a56b);
+  color: #7a4318;
 }
 
 .rank-avatar {
@@ -255,6 +337,14 @@ onMounted(load)
   border-radius: 50%;
   font-size: 13px;
   font-weight: 600;
+  overflow: hidden;
+}
+
+.rank-avatar__img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .rank-avatar--0 {
@@ -287,6 +377,60 @@ onMounted(load)
   padding-left: 14px;
   padding-right: 14px;
   background: var(--blue-soft);
+  box-shadow: inset 3px 0 0 var(--blue);
+}
+
+.rank-row:nth-child(1):not(.me) {
+  background: linear-gradient(90deg, #fff6d9, #fffdf7);
+}
+
+.rank-row:nth-child(2):not(.me) {
+  background: linear-gradient(90deg, #edf2f8, #fafcfe);
+}
+
+.rank-row:nth-child(3):not(.me) {
+  background: linear-gradient(90deg, #fbe9d8, #fffaf6);
+}
+
+.rank-row.me:nth-child(1) {
+  background: linear-gradient(90deg, #fff6d9, #fffdf7);
+}
+
+.rank-row.me:nth-child(2) {
+  background: linear-gradient(90deg, #edf2f8, #fafcfe);
+}
+
+.rank-row.me:nth-child(3) {
+  background: linear-gradient(90deg, #fbe9d8, #fffaf6);
+}
+
+.rank-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  border: 1px dashed rgba(47, 107, 255, 0.22);
+  border-radius: 14px;
+  background: rgba(47, 107, 255, 0.05);
+  padding: 10px 12px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.rank-tip strong {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.rank-tip button {
+  margin-left: auto;
+  border: 0;
+  border-radius: 999px;
+  background: var(--blue);
+  padding: 6px 12px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .rank-name {

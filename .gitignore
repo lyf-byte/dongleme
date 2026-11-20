@@ -4,11 +4,22 @@ dist-ssr
 backend-spring/target
 .screenshots
 .trae-html-share-packages
+.trae
 .env
 .env.*
 !.env.example
+.run
 *.local
 *.pem
 *.key
 .DS_Store
 npm-debug.log*
+
+# 本地设计素材与草稿，不提交
+/动了么-全栈项目详细提示词.md
+/头像.png
+/头像男.png
+/头像女.png
+/登录页图片.png
+/登录页图片-cleaned.png
+/注册完成图片.png

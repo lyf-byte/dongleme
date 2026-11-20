@@ -16,12 +16,16 @@ public record ProfileView(
         int weekMinutes,
         List<LocalDate> weekDays,
         Today today,
-        Totals total
+        Totals total,
+        List<RecentRecord> recent
 ) {
 
     public record Today(int minutes, int calories, List<String> types) {
     }
 
     public record Totals(int count, int minutes, int calories) {
+    }
+
+    public record RecentRecord(LocalDate date, String type, int duration, int calories) {
     }
 }

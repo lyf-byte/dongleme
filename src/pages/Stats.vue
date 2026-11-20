@@ -20,7 +20,7 @@ const ranges = [
   { value: 'month', label: '本月' }
 ]
 
-const chartColors = ['#2f6bff', '#16a34a', '#f6b21b', '#f97316', '#8b5cf6', '#06b6d4']
+const chartColors = ['#2f6bff', '#16a34a', '#f97316', '#06b6d4', '#8b5cf6', '#f6b21b']
 
 const range = ref('7d')
 const loading = ref(true)
@@ -46,6 +46,14 @@ const periodLabel = computed(() => {
     .slice(5)
     .replace('-', '.')}`
 })
+const todayIso = computed(() => {
+  const now = new Date()
+  const pad = (value) => String(value).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+})
+const hasToday = computed(() =>
+  (data.value.daily || []).some((day) => day.date === todayIso.value)
+)
 
 function setRange(value) {
   if (range.value === value) return
@@ -70,9 +78,15 @@ function renderCharts() {
   if (barEl.value) {
     barChart = echarts.init(barEl.value)
     const dates = data.value.daily.map((day) => day.date.slice(5).replace('-', '/'))
-    const values = data.value.daily.map((day) => day.minutes)
+    const bars = data.value.daily.map((day) => ({
+      value: day.minutes,
+      itemStyle: {
+        color: day.date === todayIso.value ? '#16a34a' : '#2f6bff',
+        borderRadius: [6, 6, 0, 0]
+      }
+    }))
     barChart.setOption({
-      grid: { left: 2, right: 6, top: 16, bottom: 2, containLabel: true },
+      grid: { left: 2, right: 6, top: 24, bottom: 2, containLabel: true },
       tooltip: {
         trigger: 'axis',
         backgroundColor: '#111827',
@@ -100,9 +114,15 @@ function renderCharts() {
       series: [
         {
           type: 'bar',
-          data: values,
+          data: bars,
           barMaxWidth: 18,
-          itemStyle: { color: '#2f6bff', borderRadius: [6, 6, 0, 0] },
+          label: {
+            show: true,
+            position: 'top',
+            fontSize: 9,
+            color: '#64748b',
+            formatter: (params) => (params.value > 0 ? params.value : '')
+          },
           emphasis: { itemStyle: { color: '#1f5bf0' } }
         }
       ]
@@ -219,8 +239,8 @@ onUnmounted(() => {
     <template v-else-if="hasData">
       <section class="card chart-card">
         <div class="chart-head">
-          <h2>每日运动</h2>
-          <span>分钟</span>
+          <h2>每日运动 <small>分钟</small></h2>
+          <span v-if="hasToday" class="today-key"><i></i>今天</span>
         </div>
         <div ref="barEl" class="chart chart-bar"></div>
       </section>
@@ -329,6 +349,28 @@ onUnmounted(() => {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
+}
+
+.chart-head h2 small {
+  margin-left: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.today-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.today-key i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #16a34a;
 }
 
 .chart-head span {
