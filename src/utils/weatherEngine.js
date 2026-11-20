@@ -1,13 +1,4 @@
-const SKY = {
-  sunny: { day: ['#3d78d8', '#5a8fd8', '#7aa6cf'], night: ['#1e3a8a', '#16255f', '#0f172a'] },
-  cloudy: { day: ['#5b7c99', '#3f5a75', '#233446'], night: ['#33465e', '#243447', '#141e2b'] },
-  overcast: { day: ['#5c6b7a', '#46525e', '#2f3a45'], night: ['#3a4450', '#2b333c', '#1b2129'] },
-  rain: { day: ['#2c5364', '#1d3a47', '#0f2027'], night: ['#1b3540', '#12242e', '#08131a'] },
-  thunder: { day: ['#414345', '#2b2d2f', '#1a1b1c'], night: ['#26282a', '#1c1e20', '#101112'] },
-  snow: { day: ['#4a6fa5', '#3a5a8c', '#274060'], night: ['#2c4269', '#22334f', '#141f33'] },
-  fog: { day: ['#606c88', '#4e5a75', '#3f4c6b'], night: ['#3b4257', '#2e3444', '#20242f'] },
-  haze: { day: ['#7a6a53', '#5c5040', '#3e3529'], night: ['#4a4136', '#37302a', '#241f1a'] }
-}
+import { SKY, sceneOf } from './weatherTheme'
 
 const CLOUD_TINTS = {
   light: { highlight: '#ffffff', core: '#ffffff', mid: '#e8f1fb', bottom: '#c9d9ec' },
@@ -212,12 +203,11 @@ export class WeatherEngine {
       this.snap.getContext('2d').drawImage(this.canvas, 0, 0)
       this.fade = 1
     }
-    this.type = SKY[type] ? type : 'cloudy'
-    this.isDay = isDay
-    this.sky = SKY[this.type][isDay ? 'day' : 'night']
-    this.cloudKind = ['rain', 'thunder'].includes(this.type)
-      ? 'cloudDark'
-      : this.type === 'overcast' ? 'cloudGray' : 'cloudLight'
+    const scene = sceneOf(type, isDay)
+    this.type = scene.type
+    this.isDay = scene.isDay
+    this.sky = scene.sky
+    this.cloudKind = scene.cloudKind
     this.flash = null
     this.flashIn = rand(1.5, 4)
     this.shoot = null

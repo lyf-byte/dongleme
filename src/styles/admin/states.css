@@ -1,0 +1,49 @@
+/* ---------- 空态 / 加载 ---------- */
+
+.admin-loading,
+.admin-empty {
+  padding: 46px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-empty svg {
+  display: block;
+  margin: 0 auto 10px;
+  color: #c1cbdb;
+}
+
+.admin-empty strong {
+  display: block;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.admin-empty span {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+/* ---------- 分页 ---------- */
+
+.admin-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 18px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-pager__info {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.admin-pager__actions {
+  display: flex;
+  gap: 8px;
+}

@@ -9,6 +9,7 @@ import com.dongleme.backend.dto.UserView;
 import com.dongleme.backend.entity.User;
 import com.dongleme.backend.mapper.UserMapper;
 import com.dongleme.backend.security.JwtService;
+import com.dongleme.backend.security.LoginThrottle;
 import com.dongleme.backend.security.UserLookupCache;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,28 +27,39 @@ public class AuthService {
     private static final Pattern PHONE_RE = Pattern.compile("^1[3-9]\\d{9}$");
     private static final Pattern EMAIL_RE = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     private static final Pattern USERNAME_RE = Pattern.compile("^[A-Za-z0-9_]{3,20}$");
+    private static final int MIN_PASSWORD_LENGTH = 6;
 
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final UserLookupCache userLookupCache;
+    private final LoginThrottle loginThrottle;
+
+    /**
+     * 账号不存在时也要跑一次 bcrypt，否则「查无此人」会比「密码错误」快一个数量级，
+     * 攻击者可以用响应时间枚举出哪些手机号/邮箱注册过。
+     */
+    private final String decoyHash;
 
     public AuthService(
             UserMapper userMapper,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            UserLookupCache userLookupCache) {
+            UserLookupCache userLookupCache,
+            LoginThrottle loginThrottle) {
         this.userMapper = userMapper;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.userLookupCache = userLookupCache;
+        this.loginThrottle = loginThrottle;
+        this.decoyHash = passwordEncoder.encode("dongleme-timing-decoy");
     }
 
-    public AuthResponse handle(AuthRequest request) {
+    public AuthResponse handle(AuthRequest request, String clientIp) {
         String action = request.action() == null ? "" : request.action();
         return switch (action) {
             case "register" -> register(request);
-            case "login" -> login(request);
+            case "login" -> login(request, clientIp);
             default -> throw ApiException.badRequest("未知的认证操作");
         };
     }
@@ -77,8 +89,8 @@ public class AuthService {
         if (!"phone".equals(lookup.type()) && !"email".equals(lookup.type())) {
             throw ApiException.badRequest("请输入正确的手机号或邮箱");
         }
-        if (password.length() < 6) {
-            throw ApiException.badRequest("密码至少 6 位");
+        if (password.length() < MIN_PASSWORD_LENGTH) {
+            throw ApiException.badRequest("密码至少 " + MIN_PASSWORD_LENGTH + " 位");
         }
         if (lookup.user() != null) {
             throw ApiException.conflict("phone".equals(lookup.type())
@@ -106,15 +118,26 @@ public class AuthService {
         return new AuthResponse(sign(saved), UserView.of(saved));
     }
 
-    private AuthResponse login(AuthRequest request) {
-        AccountLookup lookup = findUser(normalize(request.account()));
+    private AuthResponse login(AuthRequest request, String clientIp) {
+        String account = normalize(request.account());
+        loginThrottle.checkAllowed(clientIp, account);
+
+        AccountLookup lookup = findUser(account);
         String password = request.password() == null ? "" : request.password();
 
-        if (lookup.user() == null
-                || !passwordEncoder.matches(password, lookup.user().getPasswordHash())) {
+        boolean matched = lookup.user() != null
+                && passwordEncoder.matches(password, lookup.user().getPasswordHash());
+        if (lookup.user() == null) {
+            // 账号不存在时消耗等量时间，避免通过响应延迟枚举账号
+            passwordEncoder.matches(password, decoyHash);
+        }
+
+        if (!matched) {
+            loginThrottle.recordFailure(clientIp, account);
             throw ApiException.unauthorized("账号或密码错误");
         }
 
+        loginThrottle.recordSuccess(account);
         return new AuthResponse(sign(lookup.user()), UserView.of(lookup.user()));
     }
 
@@ -132,8 +155,8 @@ public class AuthService {
 
     private Map<String, Object> changePassword(AuthUpdateRequest request, String userId) {
         String newPassword = request.newPassword() == null ? "" : request.newPassword();
-        if (newPassword.length() < 6) {
-            throw ApiException.badRequest("新密码至少 6 位");
+        if (newPassword.length() < MIN_PASSWORD_LENGTH) {
+            throw ApiException.badRequest("新密码至少 " + MIN_PASSWORD_LENGTH + " 位");
         }
 
         User user = requireUser(userId);

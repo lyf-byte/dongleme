@@ -1,0 +1,145 @@
+/* ---------- 管理员登录 ---------- */
+
+.admin-login {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: flex;
+  overflow-y: auto;
+  background: #f3f6fb;
+}
+
+.admin-login__brand {
+  width: 380px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 40px 36px;
+  background: linear-gradient(165deg, #111d36 0%, #0a1324 100%);
+  color: #fff;
+}
+
+.admin-login__brand-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 21px;
+  line-height: 25px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.admin-login__brand-top span {
+  display: block;
+  margin-top: 4px;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.admin-login__logo {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(47, 107, 255, 0.32);
+}
+
+.admin-login__brand-copy {
+  margin: auto 0;
+}
+
+.admin-login__brand-copy h2 {
+  margin: 0 0 14px;
+  font-size: 32px;
+  line-height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.admin-login__brand-copy p {
+  margin: 0 0 24px;
+  font-size: 13px;
+  line-height: 21px;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.admin-login__brand-copy ul {
+  display: grid;
+  gap: 13px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-login__brand-copy li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.admin-login__brand-copy li svg {
+  color: #7da6ff;
+}
+
+.admin-login__brand-foot {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.admin-login__main {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 32px 24px;
+}
+
+.admin-login__card {
+  width: 100%;
+  max-width: 380px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+}
+
+.admin-login__card h1 {
+  margin: 0 0 6px;
+  font-size: 25px;
+  line-height: 31px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.admin-login__card > p {
+  margin: 0 0 18px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.admin-login__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+@media (max-width: 860px) {
+  .admin-login__brand {
+    display: none;
+  }
+
+  .admin-login__main {
+    padding: 20px;
+  }
+}

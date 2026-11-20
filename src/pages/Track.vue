@@ -12,7 +12,7 @@ import {
   Route as RouteIcon,
   Square
 } from 'lucide-vue-next'
-import { createRoute, errorMessage, getProfile, getRoutes } from '../utils/api'
+import { createRoute, errorMessage, getProfile } from '../utils/api'
 import { SPORTS, calcCalories } from '../utils/sport'
 import {
   distanceParts,
@@ -22,9 +22,11 @@ import {
   formatSpeed,
   limitPoints
 } from '../utils/geo'
+import { formatWhen, routePace, sportMeta } from '../utils/routeFormat'
 import { toast, confirmDialog } from '../utils/ui'
 import { useTracker } from '../composables/useTracker'
-import { wgs84ToGcj02 } from '../utils/coord'
+import { useRouteHistory } from '../composables/useRouteHistory'
+import { useLocateProbe } from '../composables/useLocateProbe'
 import RouteMap from '../components/RouteMap.vue'
 import RouteThumb from '../components/RouteThumb.vue'
 
@@ -53,6 +55,14 @@ const {
   discardDraft
 } = useTracker()
 
+const { recent, loading: loadingRoutes, load: loadRecent } = useRouteHistory(8)
+const {
+  state: locateState,
+  center: previewCenter,
+  label: locateLabel,
+  probe: locatePreview
+} = useLocateProbe()
+
 const sportOptions = SPORTS.filter((item) => ['跑步', '快走', '骑行'].includes(item.name))
 const queryType = typeof route.query.type === 'string' ? route.query.type : ''
 const selectedSport = ref(
@@ -60,20 +70,9 @@ const selectedSport = ref(
 )
 
 const profile = ref(null)
-const recent = ref([])
-const loadingRoutes = ref(true)
 const mapMissing = ref(false)
 const saving = ref(false)
 const saveError = ref('')
-const previewCenter = ref(null)
-const locateState = ref('idle')
-
-const locateLabel = computed(() => ({
-  idle: 'GPS 轨迹',
-  locating: '正在定位…',
-  ready: '已定位到你附近',
-  failed: 'GPS 轨迹'
-}[locateState.value] || 'GPS 轨迹'))
 
 const isLive = computed(() => ['tracking', 'paused'].includes(status.value))
 const isFinished = computed(() => status.value === 'finished')
@@ -109,71 +108,11 @@ const draftText = computed(() => {
   return `${draft.value.sport || '跑步'} · ${formatDistance(draft.value.distance || 0)} · ${formatDuration(draft.value.duration || 0)}`
 })
 
-function parseApiDate(value) {
-  if (value == null) return null
-  if (value instanceof Date) return value
-  if (typeof value === 'number') return new Date(value)
-  if (/[zZ]|[+-]\d{2}:\d{2}$/.test(value)) return new Date(value)
-  return new Date(`${value}+08:00`)
-}
-
-function formatWhen(value) {
-  const date = parseApiDate(value)
-  if (!date || Number.isNaN(date.getTime())) return ''
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Asia/Shanghai'
-  }).format(date)
-}
-
-function sportMeta(name) {
-  return SPORTS.find((item) => item.name === name)
-}
-
-function routePace(item) {
-  return item.type === '骑行'
-    ? `${formatSpeed(item.durationSec, item.distanceM)} km/h`
-    : formatPace(item.durationSec, item.distanceM)
-}
-
 async function loadProfile() {
   try {
     profile.value = await getProfile()
   } catch {
     /* 热量估算使用默认体重 */
-  }
-}
-
-function locatePreview() {
-  if (!('geolocation' in navigator)) {
-    locateState.value = 'failed'
-    return
-  }
-  locateState.value = 'locating'
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      const gcj = wgs84ToGcj02(position.coords.longitude, position.coords.latitude)
-      previewCenter.value = [gcj.lng, gcj.lat]
-      locateState.value = 'ready'
-    },
-    () => {
-      locateState.value = 'failed'
-    },
-    { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
-  )
-}
-
-async function loadRecent() {
-  loadingRoutes.value = true
-  try {
-    recent.value = await getRoutes(8)
-  } catch {
-    recent.value = []
-  } finally {
-    loadingRoutes.value = false
   }
 }
 

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, useId } from 'vue'
+import { sceneOf } from '../utils/weatherTheme'
 
 const props = defineProps({
   type: { type: String, default: 'cloudy' },
@@ -10,24 +11,21 @@ const uid = useId()
 const url = (name) => `url(#${uid}-${name})`
 const href = (name) => `#${uid}-${name}`
 
-const showSun = computed(() => props.type === 'sunny' && props.isDay)
-const showDimSun = computed(() => props.isDay && ['fog', 'haze'].includes(props.type))
-const showClouds = computed(() =>
-  ['cloudy', 'overcast', 'rain', 'snow', 'thunder', 'fog', 'haze'].includes(props.type)
-)
-const darkClouds = computed(() => ['rain', 'thunder'].includes(props.type))
-const showRain = computed(() => ['rain', 'thunder'].includes(props.type))
-const showSnow = computed(() => props.type === 'snow')
-const showThunder = computed(() => props.type === 'thunder')
-const showFog = computed(() => props.type === 'fog')
-const showHaze = computed(() => props.type === 'haze')
-const showStars = computed(
-  () => !props.isDay && !['rain', 'thunder', 'snow'].includes(props.type)
-)
+// 图层开关统一由 weatherTheme.sceneOf 决定，组件只负责照着画
+const scene = computed(() => sceneOf(props.type, props.isDay))
 
-const frontFill = computed(() =>
-  url(darkClouds.value ? 'cloudDark' : props.type === 'overcast' ? 'cloudGray' : 'cloudLight')
-)
+const showSun = computed(() => scene.value.showSun)
+const showDimSun = computed(() => scene.value.showDimSun)
+const showClouds = computed(() => scene.value.showClouds)
+const darkClouds = computed(() => scene.value.darkClouds)
+const showRain = computed(() => scene.value.showRain)
+const showSnow = computed(() => scene.value.showSnow)
+const showThunder = computed(() => scene.value.showThunder)
+const showFog = computed(() => scene.value.showFog)
+const showHaze = computed(() => scene.value.showHaze)
+const showStars = computed(() => scene.value.showStars)
+
+const frontFill = computed(() => url(scene.value.cloudKind))
 const backFill = computed(() => url(darkClouds.value ? 'cloudBackDark' : 'cloudBackLight'))
 
 const rays = Array.from({ length: 12 }, (_, index) => ({

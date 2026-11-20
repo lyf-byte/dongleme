@@ -1,0 +1,50 @@
+/* ---------- 标签 ---------- */
+
+.admin-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 17px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.admin-tag--blue {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.admin-tag--green {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.admin-tag--cyan {
+  background: var(--cyan-soft);
+  color: var(--cyan);
+}
+
+.admin-tag--gold {
+  background: var(--yellow-soft);
+  color: #b45309;
+}
+
+.admin-tag--orange {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
+.admin-tag--violet {
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+
+.admin-tag--red {
+  background: var(--red-soft);
+  color: var(--red);
+}

@@ -29,8 +29,26 @@ public class AuthController {
     }
 
     @PostMapping
-    public AuthResponse post(@RequestBody AuthRequest request) {
-        return authService.handle(request);
+    public AuthResponse post(
+            @RequestBody AuthRequest request,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
+        return authService.handle(request, clientIp(httpRequest));
+    }
+
+    /**
+     * 取 Caddy 追加在 X-Forwarded-For 末尾的那一跳，而不是最前面的一跳：
+     * 客户端可以自己伪造 X-Forwarded-For 前缀，但改不了代理追加的末位。
+     */
+    private static String clientIp(jakarta.servlet.http.HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            int lastComma = forwarded.lastIndexOf(',');
+            String candidate = (lastComma >= 0 ? forwarded.substring(lastComma + 1) : forwarded).trim();
+            if (!candidate.isEmpty()) {
+                return candidate;
+            }
+        }
+        return request.getRemoteAddr();
     }
 
     @GetMapping

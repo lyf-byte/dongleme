@@ -7,7 +7,6 @@ import {
   Check,
   Clock3,
   Flame,
-  LayoutGrid,
   Navigation,
   Plus,
   RefreshCw,
@@ -16,15 +15,24 @@ import {
 import { getProfile, getCustomSports } from '../utils/api'
 import { mergeSports } from '../utils/sport'
 import { avatarFor } from '../utils/avatar'
+import { useWeather } from '../composables/useWeather'
 import WeatherInline from '../components/WeatherInline.vue'
 import WeatherScene from '../components/WeatherScene.vue'
 import WeatherCanvas from '../components/WeatherCanvas.vue'
 import CustomSportManager from '../components/CustomSportManager.vue'
+import HomeSportGrid from '../components/HomeSportGrid.vue'
+import HomeRecentRecords from '../components/HomeRecentRecords.vue'
 
 const router = useRouter()
 const loading = ref(true)
 const profile = ref(null)
-const weatherTheme = ref({ type: 'default', isDay: true })
+const {
+  state: weatherState,
+  weather,
+  errorText: weatherError,
+  theme: weatherTheme,
+  load: loadWeather
+} = useWeather()
 const canvasFallback = ref(false)
 const customSports = ref([])
 const managerOpen = ref(false)
@@ -90,6 +98,14 @@ const progress = computed(() =>
   Math.min(100, Math.round((weekMinutes.value / weeklyGoal.value) * 100))
 )
 const recentRecords = computed(() => (profile.value?.recent || []).slice(0, 3))
+const recentRows = computed(() => recentRecords.value.map((item) => ({
+  key: `${item.date}-${item.type}-${item.duration}`,
+  type: item.type,
+  icon: recordIcon(item.type),
+  dateText: formatRecordDate(item.date),
+  duration: item.duration,
+  calories: item.calories
+})))
 
 function recordIcon(type) {
   return allSports.value.find((sport) => sport.name === type)?.icon || Clock3
@@ -137,10 +153,6 @@ function goCheckin(type) {
     return
   }
   router.push('/checkin')
-}
-
-function updateWeatherTheme(theme) {
-  weatherTheme.value = theme
 }
 
 function refreshDate() {
@@ -230,7 +242,12 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <WeatherInline @theme="updateWeatherTheme" />
+        <WeatherInline
+          :state="weatherState"
+          :weather="weather"
+          :error-text="weatherError"
+          @retry="loadWeather"
+        />
 
         <div class="week-strip">
           <div
@@ -292,22 +309,7 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <div class="recent-records">
-          <div
-            v-for="(item, index) in recentRecords"
-            :key="`${item.date}-${item.type}-${index}`"
-            class="recent-record"
-          >
-            <span class="recent-record__icon">
-              <component :is="recordIcon(item.type)" :size="15" />
-            </span>
-            <span class="recent-record__main">
-              <strong>{{ item.type }}</strong>
-              <small>{{ formatRecordDate(item.date) }} · {{ item.duration }} 分钟</small>
-            </span>
-            <span class="recent-record__cal">{{ item.calories }}<small>千卡</small></span>
-          </div>
-        </div>
+        <HomeRecentRecords :rows="recentRows" />
       </template>
 
       <div class="section-title">
@@ -318,35 +320,12 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <div class="sport-grid">
-        <button
-          v-for="(sport, index) in homeSports"
-          :key="sport.custom ? `custom-${sport.id}` : sport.name"
-          type="button"
-          class="sport-card"
-          @click="goCheckin(sport.name)"
-        >
-          <span
-            class="sport-icon"
-            :class="sport.custom ? 'sport-icon--custom' : 'sport-icon--' + index"
-          >
-            <component :is="sport.icon" :size="20" />
-          </span>
-          <span class="sport-name">{{ sport.name }}</span>
-          <span class="sport-met">MET {{ sport.met.toFixed(1) }}</span>
-        </button>
-
-        <button
-          v-if="hasMoreSports"
-          type="button"
-          class="sport-card"
-          @click="goCheckin()"
-        >
-          <span class="sport-icon sport-icon--more"><LayoutGrid :size="20" /></span>
-          <span class="sport-name">全部运动</span>
-          <span class="sport-met">共 {{ allSports.length }} 项</span>
-        </button>
-      </div>
+      <HomeSportGrid
+        :sports="homeSports"
+        :total="allSports.length"
+        :has-more="hasMoreSports"
+        @pick="goCheckin"
+      />
 
       <div class="home-actions">
         <button type="button" class="btn-primary home-cta" @click="goCheckin()">
@@ -777,85 +756,6 @@ onUnmounted(() => {
   color: var(--muted);
 }
 
-.sport-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-
-.sport-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  padding: 14px 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  transition: transform 0.14s ease;
-}
-
-.sport-card:active {
-  transform: scale(0.97);
-}
-
-.sport-icon {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  font-size: 17px;
-  font-weight: 700;
-}
-
-.sport-icon--0 {
-  background: var(--blue-soft);
-  color: var(--blue);
-}
-
-.sport-icon--1 {
-  background: var(--green-soft);
-  color: var(--green);
-}
-
-.sport-icon--2 {
-  background: var(--cyan-soft);
-  color: var(--cyan);
-}
-
-.sport-icon--3 {
-  background: var(--yellow-soft);
-  color: #b45309;
-}
-
-.sport-icon--4 {
-  background: var(--violet-soft);
-  color: var(--violet);
-}
-
-.sport-icon--5 {
-  background: var(--orange-soft);
-  color: var(--orange);
-}
-
-.sport-icon--6 {
-  background: var(--red-soft);
-  color: var(--red);
-}
-
-.sport-icon--custom {
-  background: var(--violet-soft);
-  color: var(--violet);
-}
-
-.sport-icon--more {
-  background: var(--surface-2);
-  color: var(--muted);
-}
-
 .manage-btn {
   display: inline-flex;
   align-items: center;
@@ -870,16 +770,6 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-.sport-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.sport-met {
-  font-size: 10px;
-  color: var(--muted);
-}
 
 .home-actions {
   display: grid;
@@ -901,70 +791,6 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
-.recent-records {
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
-  padding: 2px 14px;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
-}
-
-.recent-record {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
-}
-
-.recent-record:first-child {
-  border-top: 0;
-}
-
-.recent-record__icon {
-  width: 34px;
-  height: 34px;
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  border-radius: 11px;
-  background: var(--blue-soft);
-  color: var(--blue);
-}
-
-.recent-record__main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.recent-record__main strong {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.recent-record__main small {
-  font-size: 10px;
-  color: var(--muted);
-}
-
-.recent-record__cal {
-  flex: 0 0 auto;
-  color: var(--orange);
-  font-size: 13px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.recent-record__cal small {
-  margin-left: 1px;
-  color: var(--muted);
-  font-size: 9px;
-  font-weight: 500;
-}
 
 .home-track {
   display: flex;

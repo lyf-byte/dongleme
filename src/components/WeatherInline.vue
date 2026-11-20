@@ -1,28 +1,23 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { MapPin, RefreshCw, ChevronDown, ChevronUp } from 'lucide-vue-next'
-import { getWeather, errorMessage } from '../utils/api'
-import { wgs84ToGcj02 } from '../utils/coord'
 
-const CACHE_KEY = 'dlm_weather_cache'
-const CACHE_TTL = 15 * 60 * 1000
+const props = defineProps({
+  state: { type: String, default: 'loading' },
+  weather: { type: Object, default: null },
+  errorText: { type: String, default: '' }
+})
+const emit = defineEmits(['retry'])
 
 const router = useRouter()
-const emit = defineEmits(['theme'])
-const state = ref('loading')
-const weather = ref(null)
-const errorText = ref('')
 const detailOpen = ref(true)
 
-const current = computed(() => weather.value?.current || {})
-const air = computed(() => weather.value?.air || {})
-const advice = computed(() => weather.value?.advice || {})
-const daily = computed(() => weather.value?.daily || [])
+const current = computed(() => props.weather?.current || {})
+const air = computed(() => props.weather?.air || {})
+const advice = computed(() => props.weather?.advice || {})
+const daily = computed(() => props.weather?.daily || [])
 const sports = computed(() => advice.value.sports || [])
-
-const type = computed(() => current.value.weatherType || 'cloudy')
-const isDay = computed(() => current.value.isDay !== false)
 const temperature = computed(() => Math.round(Number(current.value.temperature) || 0))
 const humidity = computed(() =>
   current.value.humidity == null ? null : Number(current.value.humidity)
@@ -82,75 +77,6 @@ function goCheckin(sport) {
   router.push({ path: '/checkin', query: { type: sport } })
 }
 
-function emitTheme() {
-  if (state.value === 'ready' && weather.value) {
-    emit('theme', { type: type.value, isDay: isDay.value })
-    return
-  }
-  emit('theme', { type: 'default', isDay: true })
-}
-
-function loadFromCache() {
-  try {
-    const raw = sessionStorage.getItem(CACHE_KEY)
-    if (!raw) return false
-    const cached = JSON.parse(raw)
-    if (Date.now() - cached.at > CACHE_TTL) return false
-    weather.value = cached.data
-    state.value = 'ready'
-    emitTheme()
-    return true
-  } catch {
-    return false
-  }
-}
-
-function saveCache(data) {
-  try {
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), data }))
-  } catch {
-    /* 忽略存储异常 */
-  }
-}
-
-function load() {
-  if (!navigator.geolocation) {
-    state.value = 'denied'
-    errorText.value = '当前浏览器不支持定位'
-    emitTheme()
-    return
-  }
-
-  state.value = 'loading'
-  errorText.value = ''
-
-  navigator.geolocation.getCurrentPosition(
-    async (position) => {
-      try {
-        const gcj = wgs84ToGcj02(position.coords.longitude, position.coords.latitude)
-        const data = await getWeather(gcj.lat, gcj.lng)
-        weather.value = data
-        saveCache(data)
-        state.value = 'ready'
-        emitTheme()
-      } catch (error) {
-        errorText.value = errorMessage(error, '天气加载失败')
-        state.value = 'error'
-        emitTheme()
-      }
-    },
-    () => {
-      state.value = 'denied'
-      errorText.value = '开启定位后查看实时天气'
-      emitTheme()
-    },
-    { timeout: 8000, maximumAge: 10 * 60 * 1000, enableHighAccuracy: false }
-  )
-}
-
-onMounted(() => {
-  if (!loadFromCache()) load()
-})
 </script>
 
 <template>
@@ -241,7 +167,7 @@ onMounted(() => {
             : '正在获取天气…'
       }}
     </span>
-    <button v-if="state !== 'loading'" type="button" @click="load">
+    <button v-if="state !== 'loading'" type="button" @click="emit('retry')">
       {{ state === 'denied' ? '重新定位' : '重试' }}
     </button>
   </div>

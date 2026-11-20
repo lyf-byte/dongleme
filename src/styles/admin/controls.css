@@ -1,0 +1,99 @@
+/* ---------- 按钮与输入 ---------- */
+
+.admin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.admin-btn:hover {
+  border-color: #c9d5e8;
+  background: #f8faff;
+}
+
+.admin-btn:active {
+  transform: scale(0.98);
+}
+
+.admin-btn--primary {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(47, 107, 255, 0.22);
+}
+
+.admin-btn--primary:hover {
+  background: #1f5bf0;
+  border-color: #1f5bf0;
+}
+
+.admin-btn--danger {
+  border-color: transparent;
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.admin-btn--danger:hover {
+  background: #fee2e2;
+}
+
+.admin-btn--sm {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.admin-btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.admin-input,
+.admin-select {
+  height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-input:focus,
+.admin-select:focus {
+  border-color: rgba(47, 107, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(47, 107, 255, 0.1);
+}
+
+.admin-input::placeholder {
+  color: #a3aec0;
+}
+
+.admin-input--search {
+  width: 220px;
+}
+
+.admin-input[type="date"] {
+  width: 152px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+
+.admin-select {
+  cursor: pointer;
+}
