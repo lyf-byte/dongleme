@@ -10,7 +10,8 @@ import {
   Navigation,
   Plus,
   RefreshCw,
-  Settings2
+  Settings2,
+  Timer
 } from 'lucide-vue-next'
 import { getProfile, getCustomSports } from '../utils/api'
 import { mergeSports } from '../utils/sport'
@@ -332,9 +333,13 @@ onUnmounted(() => {
           <Plus :size="18" />
           记录一次运动
         </button>
-        <button type="button" class="home-track" @click="router.push('/track')">
+        <button type="button" class="home-secondary" @click="router.push('/track')">
           <Navigation :size="18" />
           轨迹运动
+        </button>
+        <button type="button" class="home-secondary" @click="router.push('/timer')">
+          <Timer :size="18" />
+          运动计时
         </button>
       </div>
 
@@ -779,6 +784,7 @@ onUnmounted(() => {
 }
 
 .home-cta {
+  grid-column: 1 / -1;
   margin-top: 0;
 }
 
@@ -792,7 +798,7 @@ onUnmounted(() => {
 }
 
 
-.home-track {
+.home-secondary {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -807,7 +813,7 @@ onUnmounted(() => {
   box-shadow: 0 6px 16px rgba(47, 107, 255, 0.08);
 }
 
-.home-track:active {
+.home-secondary:active {
   transform: scale(0.99);
 }
 

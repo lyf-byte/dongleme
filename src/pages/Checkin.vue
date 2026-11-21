@@ -6,6 +6,15 @@ import { getProfile, getCustomSports, submitCheckin, errorMessage } from '../uti
 import { SPORTS, calcCalories, mergeSports } from '../utils/sport'
 import { toast, confirmDialog } from '../utils/ui'
 import { saveBlob } from '../utils/native'
+import posterCheckin from '../assets/poster-checkin.jpg'
+import {
+  POSTER_FONT,
+  canvasToBlob,
+  clipText,
+  drawBandChrome,
+  drawStatColumns,
+  loadPosterImage
+} from '../utils/poster'
 import CustomSportManager from '../components/CustomSportManager.vue'
 
 const route = useRoute()
@@ -18,15 +27,27 @@ const allSports = computed(() => mergeSports(customSports.value))
 const routeType = typeof route.query.type === 'string' ? route.query.type : ''
 const initialSport = allSports.value.find((sport) => sport.name === routeType)
 
+// 运动计时器跳过来时会带上 duration（分钟），这里直接回填
+const routeDuration = Number(route.query.duration)
+const initialDuration = Number.isInteger(routeDuration) && routeDuration >= 1 && routeDuration <= 600
+  ? routeDuration
+  : 30
+
 const form = ref({
   type: initialSport ? initialSport.name : '跑步',
-  duration: 30,
+  duration: initialDuration,
   weight: 60
 })
 const gender = ref('secret')
 const todayTypes = ref([])
 const submitting = ref(false)
 const success = ref(null)
+const posterUrl = ref('')
+const posterBlob = ref(null)
+const posterLoading = ref(false)
+const posterError = ref('')
+const savingPoster = ref(false)
+let posterTask = 0
 
 const currentSport = computed(
   () => allSports.value.find((sport) => sport.name === form.value.type) || allSports.value[0]
@@ -106,6 +127,7 @@ async function submit(overwrite = false) {
       streak: result.streak,
       date: result.date
     }
+    preparePoster(success.value)
   } catch (error) {
     if (error?.response?.status === 409 && !overwrite) {
       try {
@@ -127,100 +149,111 @@ async function submit(overwrite = false) {
   }
 }
 
+function releasePoster() {
+  // 递增任务号，让还未返回的生成任务作废
+  posterTask += 1
+  if (posterUrl.value) URL.revokeObjectURL(posterUrl.value)
+  posterUrl.value = ''
+  posterBlob.value = null
+  posterLoading.value = false
+  posterError.value = ''
+}
+
 function finishSuccess() {
+  releasePoster()
   success.value = null
   router.replace('/')
 }
 
-function saveSuccessPoster() {
-  if (!success.value) return
-  const data = success.value
+// 海报底图 1024×1536，底部再拼一条 176px 的信息条，避免遮挡画面上的标题与文案
+const POSTER_WIDTH = 1024
+const POSTER_IMAGE_HEIGHT = 1536
+const POSTER_BAND_HEIGHT = 176
+
+
+function posterDateText(value) {
+  const raw = String(value || '')
+  const matched = raw.match(/^\d{4}-(\d{2})-(\d{2})$/)
+  if (matched) {
+    return `${Number(matched[1])}月${Number(matched[2])}日`
+  }
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'Asia/Shanghai'
+  }).format(new Date())
+}
+
+async function buildPoster(data) {
+  const image = await loadPosterImage(posterCheckin)
+
   const canvas = document.createElement('canvas')
-  const width = 620
-  const height = 880
-  canvas.width = width
-  canvas.height = height
+  const bandTop = POSTER_IMAGE_HEIGHT
+  canvas.width = POSTER_WIDTH
+  canvas.height = bandTop + POSTER_BAND_HEIGHT
   const ctx = canvas.getContext('2d')
   if (!ctx) {
-    toast('当前浏览器不支持生成海报')
-    return
+    throw new Error('canvas unsupported')
   }
 
-  const background = ctx.createLinearGradient(0, 0, width, height)
-  background.addColorStop(0, '#2f6bff')
-  background.addColorStop(1, '#16337f')
-  ctx.fillStyle = background
-  ctx.fillRect(0, 0, width, height)
+  // 底图按原始分辨率 1:1 铺满，文字与照片都不失真
+  ctx.drawImage(image, 0, 0, POSTER_WIDTH, POSTER_IMAGE_HEIGHT)
 
-  ctx.fillStyle = 'rgba(255,255,255,0.08)'
-  ctx.beginPath()
-  ctx.arc(540, 140, 170, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.beginPath()
-  ctx.arc(70, 790, 130, 0, Math.PI * 2)
-  ctx.fill()
+  drawBandChrome(ctx, POSTER_WIDTH, bandTop, POSTER_BAND_HEIGHT)
 
-  const font = "'PingFang SC', 'Microsoft YaHei', sans-serif"
-  ctx.fillStyle = 'rgba(255,255,255,0.78)'
-  ctx.font = `26px ${font}`
-  ctx.fillText('动了么 · 每日打卡', 52, 86)
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.font = `24px ${POSTER_FONT}`
+  ctx.fillText('动了么 · 每日打卡', 64, bandTop + 60)
 
   ctx.fillStyle = '#ffffff'
-  ctx.font = `bold 64px ${font}`
-  ctx.fillText('打卡成功', 52, 182)
+  ctx.font = `bold 42px ${POSTER_FONT}`
+  const title = `${posterDateText(data.date)} · ${data.type || '运动'}`
+  ctx.fillText(clipText(ctx, title, 440), 64, bandTop + 120)
 
-  const dateText = String(data.date || '').slice(5).replace('-', '月') + '日'
-  ctx.fillStyle = 'rgba(255,255,255,0.82)'
-  ctx.font = `30px ${font}`
-  ctx.fillText(`${data.type} · ${dateText}`, 52, 232)
-
-  ctx.fillStyle = 'rgba(255,255,255,0.12)'
-  if (typeof ctx.roundRect === 'function') {
-    ctx.beginPath()
-    ctx.roundRect(44, 300, width - 88, 250, 30)
-    ctx.fill()
-  } else {
-    ctx.fillRect(44, 300, width - 88, 250)
-  }
-
-  const metrics = [
-    { label: '运动时长', value: data.duration, unit: '分钟' },
-    { label: '消耗热量', value: data.calories, unit: '千卡' },
-    { label: '连续打卡', value: data.streak, unit: '天' }
-  ]
-  metrics.forEach((metric, index) => {
-    const x = 76 + index * 170
-    ctx.fillStyle = 'rgba(255,255,255,0.66)'
-    ctx.font = `24px ${font}`
-    ctx.fillText(metric.label, x, 360)
-    ctx.fillStyle = '#ffffff'
-    ctx.font = `bold 58px ${font}`
-    ctx.fillText(String(metric.value), x, 438)
-    ctx.fillStyle = 'rgba(255,255,255,0.7)'
-    ctx.font = `24px ${font}`
-    ctx.fillText(metric.unit, x, 480)
+  drawStatColumns(ctx, [
+    { label: '时长', value: data.duration, unit: '分钟' },
+    { label: '热量', value: data.calories, unit: '千卡' },
+    { label: '连续', value: data.streak, unit: '天' }
+  ], {
+    right: POSTER_WIDTH - 64,
+    labelY: bandTop + 60,
+    valueY: bandTop + 122
   })
 
-  ctx.fillStyle = 'rgba(255,255,255,0.28)'
-  ctx.font = `28px ${font}`
-  ctx.fillText('每天动一点，连续看得见', 52, 650)
+  return canvasToBlob(canvas)
+}
 
-  ctx.fillStyle = 'rgba(255,255,255,0.16)'
-  ctx.beginPath()
-  ctx.arc(310, 748, 54, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.fillStyle = '#ffffff'
-  ctx.font = `bold 42px ${font}`
-  ctx.fillText('动', 291, 764)
-
-  canvas.toBlob(async (blob) => {
-    if (!blob) {
-      toast('海报生成失败')
-      return
+async function preparePoster(data) {
+  const task = ++posterTask
+  posterLoading.value = true
+  posterError.value = ''
+  try {
+    const blob = await buildPoster(data)
+    if (task !== posterTask) return
+    posterBlob.value = blob
+    posterUrl.value = URL.createObjectURL(blob)
+  } catch {
+    if (task === posterTask) {
+      posterError.value = '海报生成失败，可以直接完成打卡'
     }
-    const result = await saveBlob(blob, `dongleme-checkin-${data.date || 'today'}.png`)
+  } finally {
+    if (task === posterTask) posterLoading.value = false
+  }
+}
+
+async function savePoster() {
+  if (!posterBlob.value || savingPoster.value) return
+  savingPoster.value = true
+  try {
+    const result = await saveBlob(
+      posterBlob.value,
+      `dongleme-checkin-${success.value?.date || 'today'}.png`
+    )
     toast(result === 'ok' ? '打卡海报已保存' : '保存失败，请重试')
-  }, 'image/png')
+    if (result === 'ok') finishSuccess()
+  } finally {
+    savingPoster.value = false
+  }
 }
 
 onMounted(() => {
@@ -333,31 +366,39 @@ onMounted(() => {
 
     <transition name="ui">
       <div v-if="success" class="checkin-overlay" @click.self="finishSuccess">
-        <div class="checkin-sheet" role="dialog" aria-modal="true" aria-label="打卡成功">
-          <span class="success-check"><Check :size="26" /></span>
-          <h2>打卡成功</h2>
-          <p>{{ success.type }} · {{ success.duration }} 分钟</p>
-
-          <div class="success-stats">
+        <div
+          class="checkin-sheet checkin-sheet--poster"
+          role="dialog"
+          aria-modal="true"
+          aria-label="打卡成功"
+        >
+          <div class="poster-head">
+            <span class="success-check"><Check :size="18" /></span>
             <div>
-              <strong>{{ success.duration }}</strong>
-              <span>分钟</span>
-            </div>
-            <div>
-              <strong>{{ success.calories }}</strong>
-              <span>千卡</span>
-            </div>
-            <div>
-              <strong>{{ success.streak }}</strong>
-              <span>连续天数</span>
+              <h2>打卡成功</h2>
+              <p>{{ success.type }} · {{ success.duration }} 分钟 · {{ success.calories }} 千卡</p>
             </div>
           </div>
 
-          <button type="button" class="btn-primary success-poster" @click="saveSuccessPoster">
+          <div class="poster-frame">
+            <img v-if="posterUrl" :src="posterUrl" alt="打卡海报预览" />
+            <div v-else class="poster-placeholder">
+              {{ posterError || '正在生成海报…' }}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            class="btn-primary success-poster"
+            :disabled="!posterBlob || savingPoster"
+            @click="savePoster"
+          >
             <Download :size="16" />
-            保存打卡海报
+            {{ savingPoster ? '保存中…' : '保存海报' }}
           </button>
-          <button type="button" class="success-done" @click="finishSuccess">完成</button>
+          <button type="button" class="success-done" @click="finishSuccess">
+            {{ posterBlob ? '不保存，直接完成' : '完成' }}
+          </button>
         </div>
       </div>
     </transition>
@@ -693,35 +734,67 @@ onMounted(() => {
   font-size: 12px;
 }
 
-.success-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  width: 100%;
-  margin-top: 18px;
-  border-radius: 16px;
-  background: #f8fafc;
-  padding: 12px 0;
+.checkin-sheet--poster {
+  align-items: stretch;
+  max-width: 320px;
+  padding: 16px 14px 12px;
 }
 
-.success-stats > div {
+.poster-head {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
 }
 
-.success-stats > div + div {
-  border-left: 1px solid var(--line);
+.poster-head .success-check {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
 }
 
-.success-stats strong {
-  color: var(--text);
-  font-size: 22px;
-  font-variant-numeric: tabular-nums;
+.poster-head h2 {
+  margin: 0;
+  font-size: 16px;
 }
 
-.success-stats span {
+.poster-head p {
+  margin: 2px 0 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
+}
+
+.poster-frame {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.poster-frame img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 52vh;
+  border-radius: 12px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.2);
+}
+
+.poster-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 220px;
+  padding: 20px;
+  border-radius: 12px;
+  background: #f4f6fa;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.success-poster:disabled {
+  opacity: 0.6;
 }
 
 .success-poster {
@@ -730,7 +803,7 @@ onMounted(() => {
   justify-content: center;
   gap: 6px;
   width: 100%;
-  margin-top: 18px;
+  margin-top: 14px;
 }
 
 .success-done {

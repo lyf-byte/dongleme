@@ -6,6 +6,16 @@ import { deleteRoute, errorMessage, getRoute } from '../utils/api'
 import { SPORTS } from '../utils/sport'
 import { distanceParts, formatDuration, formatPace, formatSpeed } from '../utils/geo'
 import { toast, confirmDialog } from '../utils/ui'
+import { saveBlob } from '../utils/native'
+import posterTrack from '../assets/poster-track.jpg'
+import {
+  POSTER_FONT,
+  canvasToBlob,
+  clipText,
+  drawBandChrome,
+  drawStatColumns,
+  loadPosterImage
+} from '../utils/poster'
 import RouteMap from '../components/RouteMap.vue'
 
 const route = useRoute()
@@ -83,177 +93,64 @@ async function removeRoute() {
   }
 }
 
-function drawTrack(ctx, points, x, y, width, height) {
-  const valid = (points || []).filter(
-    (point) => Number.isFinite(point?.lat) && Number.isFinite(point?.lng)
-  )
-  if (valid.length < 2) return
+const POSTER_WIDTH = 1024
+const POSTER_IMAGE_HEIGHT = 1024
+const POSTER_BAND_HEIGHT = 288
 
-  const lats = valid.map((point) => point.lat)
-  const lngs = valid.map((point) => point.lng)
-  const minLat = Math.min(...lats)
-  const maxLat = Math.max(...lats)
-  const minLng = Math.min(...lngs)
-  const maxLng = Math.max(...lngs)
-  const midLat = (minLat + maxLat) / 2
-  const latSpan = Math.max(maxLat - minLat, 1e-9)
-  const lngSpan = Math.max((maxLng - minLng) * Math.cos((midLat * Math.PI) / 180), 1e-9)
-  const pad = 36
-  const scale = Math.min((width - pad * 2) / lngSpan, (height - pad * 2) / latSpan)
-  const trackW = lngSpan * scale
-  const trackH = latSpan * scale
-  const offsetX = x + (width - trackW) / 2
-  const offsetY = y + (height - trackH) / 2
+async function savePoster() {
+  if (!detail.value) return
 
-  const toPoint = (point) => [
-    offsetX + (point.lng - minLng) * Math.cos((midLat * Math.PI) / 180) * scale,
-    offsetY + (maxLat - point.lat) * scale
-  ]
-
-  ctx.save()
-  ctx.lineJoin = 'round'
-  ctx.lineCap = 'round'
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)'
-  ctx.lineWidth = 14
-  ctx.beginPath()
-  valid.forEach((point, index) => {
-    const [px, py] = toPoint(point)
-    if (index === 0) ctx.moveTo(px, py)
-    else ctx.lineTo(px, py)
-  })
-  ctx.stroke()
-
-  ctx.strokeStyle = '#ffffff'
-  ctx.lineWidth = 6
-  ctx.shadowColor = 'rgba(47, 107, 255, 0.55)'
-  ctx.shadowBlur = 16
-  ctx.beginPath()
-  valid.forEach((point, index) => {
-    const [px, py] = toPoint(point)
-    if (index === 0) ctx.moveTo(px, py)
-    else ctx.lineTo(px, py)
-  })
-  ctx.stroke()
-  ctx.shadowBlur = 0
-
-  const [sx, sy] = toPoint(valid[0])
-  const [ex, ey] = toPoint(valid[valid.length - 1])
-  ctx.fillStyle = '#4ade80'
-  ctx.beginPath()
-  ctx.arc(sx, sy, 8, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.fillStyle = '#fb923c'
-  ctx.beginPath()
-  ctx.arc(ex, ey, 8, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.restore()
-}
-
-function roundRect(ctx, x, y, width, height, radius) {
-  if (typeof ctx.roundRect === 'function') {
-    ctx.beginPath()
-    ctx.roundRect(x, y, width, height, radius)
+  let image
+  try {
+    image = await loadPosterImage(posterTrack)
+  } catch {
+    toast('海报底图加载失败，请重试')
     return
   }
-  ctx.beginPath()
-  ctx.moveTo(x + radius, y)
-  ctx.arcTo(x + width, y, x + width, y + height, radius)
-  ctx.arcTo(x + width, y + height, x, y + height, radius)
-  ctx.arcTo(x, y + height, x, y, radius)
-  ctx.arcTo(x, y, x + width, y, radius)
-  ctx.closePath()
-}
 
-function savePoster() {
-  if (!detail.value) return
   const canvas = document.createElement('canvas')
-  const width = 720
-  const height = 1040
-  canvas.width = width
-  canvas.height = height
+  const bandTop = POSTER_IMAGE_HEIGHT
+  canvas.width = POSTER_WIDTH
+  canvas.height = bandTop + POSTER_BAND_HEIGHT
   const ctx = canvas.getContext('2d')
   if (!ctx) {
     toast('当前浏览器不支持生成海报')
     return
   }
 
-  const background = ctx.createLinearGradient(0, 0, width, height)
-  background.addColorStop(0, '#2f6bff')
-  background.addColorStop(1, '#10265f')
-  ctx.fillStyle = background
-  ctx.fillRect(0, 0, width, height)
+  ctx.drawImage(image, 0, 0, POSTER_WIDTH, POSTER_IMAGE_HEIGHT)
+  drawBandChrome(ctx, POSTER_WIDTH, bandTop, POSTER_BAND_HEIGHT)
 
-  ctx.fillStyle = 'rgba(255,255,255,0.08)'
-  ctx.beginPath()
-  ctx.arc(620, 170, 190, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.beginPath()
-  ctx.arc(80, 930, 150, 0, Math.PI * 2)
-  ctx.fill()
-
-  const font = "'PingFang SC', 'Microsoft YaHei', sans-serif"
-  ctx.fillStyle = 'rgba(255,255,255,0.78)'
-  ctx.font = `28px ${font}`
-  ctx.fillText('动了么 · 运动轨迹', 56, 92)
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.font = `24px ${POSTER_FONT}`
+  ctx.fillText('动了么 · 运动轨迹', 64, bandTop + 56)
 
   ctx.fillStyle = '#ffffff'
-  ctx.font = `bold 56px ${font}`
-  ctx.fillText(`${detail.value.type}轨迹`, 56, 174)
+  ctx.font = `bold 42px ${POSTER_FONT}`
+  const title = `${detail.value.type || '运动'} · ${formatWhen(detail.value.startedAt)}`
+  ctx.fillText(clipText(ctx, title, 700), 64, bandTop + 116)
 
-  ctx.fillStyle = 'rgba(255,255,255,0.82)'
-  ctx.font = `28px ${font}`
-  ctx.fillText(formatWhen(detail.value.startedAt), 56, 224)
-
-  ctx.fillStyle = 'rgba(255,255,255,0.1)'
-  ctx.strokeStyle = 'rgba(255,255,255,0.16)'
-  ctx.lineWidth = 2
-  roundRect(ctx, 44, 270, width - 88, 470, 32)
-  ctx.fill()
-  ctx.stroke()
-  drawTrack(ctx, detail.value.points, 60, 286, width - 120, 438)
-
-  const metrics = [
+  drawStatColumns(ctx, [
     { label: '距离', value: distanceView.value.value, unit: distanceView.value.unit },
     { label: '时长', value: formatDuration(detail.value.durationSec), unit: '' },
     { label: paceLabel.value, value: paceValue.value, unit: '' },
     { label: '热量', value: detail.value.calories, unit: '千卡' }
-  ]
-  const startX = 56
-  const columnWidth = (width - 112) / 4
-  metrics.forEach((metric, index) => {
-    const x = startX + columnWidth * index
-    ctx.fillStyle = 'rgba(255,255,255,0.62)'
-    ctx.font = `24px ${font}`
-    ctx.fillText(metric.label, x, 810)
-    ctx.fillStyle = '#ffffff'
-    ctx.font = `bold 42px ${font}`
-    ctx.fillText(String(metric.value), x, 864)
-    if (metric.unit) {
-      ctx.fillStyle = 'rgba(255,255,255,0.7)'
-      ctx.font = `22px ${font}`
-      ctx.fillText(metric.unit, x, 898)
-    }
+  ], {
+    left: 64,
+    right: POSTER_WIDTH - 64,
+    labelY: bandTop + 182,
+    valueY: bandTop + 240,
+    valueSize: 42,
+    spread: true
   })
 
-  ctx.fillStyle = 'rgba(255,255,255,0.62)'
-  ctx.font = `24px ${font}`
-  ctx.fillText('每天动一点，连续看得见', 56, 970)
-
-  canvas.toBlob((blob) => {
-    if (!blob) {
-      toast('海报生成失败')
-      return
-    }
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `dongleme-route-${detail.value.id}.png`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    toast('轨迹海报已保存')
-  }, 'image/png')
+  try {
+    const blob = await canvasToBlob(canvas)
+    const result = await saveBlob(blob, `dongleme-route-${detail.value.id}.png`)
+    toast(result === 'ok' ? '轨迹海报已保存' : '保存失败，请重试')
+  } catch {
+    toast('海报生成失败')
+  }
 }
 
 onMounted(load)

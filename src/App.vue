@@ -14,7 +14,7 @@ const tabs = [
   { label: '我的', path: '/mine', icon: User }
 ]
 
-const hiddenPrefixes = ['/checkin', '/auth', '/onboarding', '/track', '/settings']
+const hiddenPrefixes = ['/checkin', '/auth', '/onboarding', '/track', '/timer', '/settings']
 const isAdmin = computed(() => route.path.startsWith('/admin'))
 const showTabbar = computed(() => (
   !hiddenPrefixes.some((path) => route.path === path || route.path.startsWith(`${path}/`))

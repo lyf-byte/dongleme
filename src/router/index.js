@@ -16,6 +16,7 @@ const routes = [
   { path: '/', name: 'home', component: () => import('../pages/Home.vue') },
   { path: '/checkin', name: 'checkin', component: () => import('../pages/Checkin.vue') },
   { path: '/track', name: 'track', component: () => import('../pages/Track.vue') },
+  { path: '/timer', name: 'timer', component: () => import('../pages/Timer.vue') },
   {
     path: '/track/:id',
     name: 'track-detail',

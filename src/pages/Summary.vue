@@ -5,6 +5,14 @@ import { generateSummary, errorMessage } from '../utils/api'
 import { toast } from '../utils/ui'
 import { saveBlob } from '../utils/native'
 import emptySummary from '../assets/empty-summary.svg'
+import posterSummary from '../assets/poster-summary.jpg'
+import {
+  POSTER_FONT,
+  canvasToBlob,
+  drawBandChrome,
+  loadPosterImage,
+  wrapLines
+} from '../utils/poster'
 
 const loading = ref(true)
 const generating = ref(false)
@@ -69,111 +77,77 @@ async function copy() {
   }
 }
 
-function wrapLines(ctx, text, maxWidth) {
-  const lines = []
-  let line = ''
-  for (const char of text) {
-    if (char === '\n') {
-      lines.push(line)
-      line = ''
-      continue
-    }
-    if (ctx.measureText(line + char).width > maxWidth) {
-      lines.push(line)
-      line = char
-    } else {
-      line += char
-    }
-  }
-  if (line) lines.push(line)
-  return lines
-}
+// 底图 1024×1024，下方接一块随文字长度自适应的信息面板
+const POSTER_WIDTH = 1024
+const POSTER_IMAGE_HEIGHT = 1024
+const SUMMARY_LINE_HEIGHT = 62
+const SUMMARY_MAX_LINES = 14
 
-function drawRoundRect(ctx, x, y, width, height, radius) {
-  if (typeof ctx.roundRect === 'function') {
-    ctx.beginPath()
-    ctx.roundRect(x, y, width, height, radius)
-    return
-  }
-  ctx.beginPath()
-  ctx.moveTo(x + radius, y)
-  ctx.arcTo(x + width, y, x + width, y + height, radius)
-  ctx.arcTo(x + width, y + height, x, y + height, radius)
-  ctx.arcTo(x, y + height, x, y, radius)
-  ctx.arcTo(x, y, x + width, y, radius)
-  ctx.closePath()
-}
-
-function savePoster() {
+async function savePoster() {
   if (!content.value) return
 
+  let image
+  try {
+    image = await loadPosterImage(posterSummary)
+  } catch {
+    toast('海报底图加载失败，请重试')
+    return
+  }
+
   const canvas = document.createElement('canvas')
-  const width = 750
-  const height = 1000
-  canvas.width = width
-  canvas.height = height
+  const bandTop = POSTER_IMAGE_HEIGHT
+  canvas.width = POSTER_WIDTH
+  // 高度依赖文字行数，先占位再改尺寸；改尺寸会重置绘图状态，因此必须在绘制前算好
+  canvas.height = bandTop + 10
   const ctx = canvas.getContext('2d')
   if (!ctx) {
     toast('当前浏览器不支持生成海报')
     return
   }
 
-  const background = ctx.createLinearGradient(0, 0, width, height)
-  background.addColorStop(0, '#2f6bff')
-  background.addColorStop(1, '#16337f')
-  ctx.fillStyle = background
-  ctx.fillRect(0, 0, width, height)
-
-  ctx.fillStyle = 'rgba(255,255,255,0.08)'
-  ctx.beginPath()
-  ctx.arc(640, 150, 190, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.beginPath()
-  ctx.arc(90, 900, 160, 0, Math.PI * 2)
-  ctx.fill()
-
-  const font = "'PingFang SC', 'Microsoft YaHei', sans-serif"
-  ctx.fillStyle = 'rgba(255,255,255,0.78)'
-  ctx.font = `28px ${font}`
-  ctx.fillText('动了么 · 校园运动打卡', 64, 96)
-
-  ctx.fillStyle = '#ffffff'
-  ctx.font = `bold 56px ${font}`
-  ctx.fillText('本周小结', 64, 182)
-
-  ctx.fillStyle = 'rgba(255,255,255,0.82)'
-  ctx.font = `30px ${font}`
-  ctx.fillText(weekLabel.value || '', 64, 234)
-
-  ctx.fillStyle = 'rgba(255,255,255,0.12)'
-  drawRoundRect(ctx, 48, 286, width - 96, 556, 32)
-  ctx.fill()
-
-  ctx.fillStyle = '#ffffff'
-  ctx.font = `30px ${font}`
+  ctx.font = `40px ${POSTER_FONT}`
   const lines = wrapLines(
     ctx,
     content.value.replace(/\s+/g, ' ').trim(),
-    width - 96 - 96
-  ).slice(0, 10)
-  let y = 356
-  for (const line of lines) {
-    ctx.fillText(line, 96, y)
-    y += 46
-  }
+    POSTER_WIDTH - 128
+  ).slice(0, SUMMARY_MAX_LINES)
 
-  ctx.fillStyle = 'rgba(255,255,255,0.72)'
-  ctx.font = `26px ${font}`
-  ctx.fillText('每天动一点，连续看得见', 64, 922)
+  const textTop = bandTop + 206
+  const footerY = textTop + Math.max(0, lines.length - 1) * SUMMARY_LINE_HEIGHT + 76
+  const bandHeight = footerY - bandTop + 56
+  canvas.height = bandTop + bandHeight
 
-  canvas.toBlob(async (blob) => {
-    if (!blob) {
-      toast('海报生成失败')
-      return
-    }
+  ctx.drawImage(image, 0, 0, POSTER_WIDTH, POSTER_IMAGE_HEIGHT)
+  drawBandChrome(ctx, POSTER_WIDTH, bandTop, bandHeight)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.font = `24px ${POSTER_FONT}`
+  ctx.fillText('动了么 · 运动周小结', 64, bandTop + 62)
+
+  ctx.fillStyle = '#ffffff'
+  ctx.font = `bold 44px ${POSTER_FONT}`
+  ctx.fillText(weekLabel.value || '本周小结', 64, bandTop + 124)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.14)'
+  ctx.fillRect(64, bandTop + 152, POSTER_WIDTH - 128, 1)
+
+  ctx.fillStyle = 'rgba(255,255,255,0.92)'
+  ctx.font = `40px ${POSTER_FONT}`
+  lines.forEach((line, index) => {
+    ctx.fillText(line, 64, textTop + index * SUMMARY_LINE_HEIGHT)
+  })
+
+  ctx.fillStyle = 'rgba(255,255,255,0.42)'
+  ctx.font = `24px ${POSTER_FONT}`
+  ctx.fillText('每天动一点，连续看得见', 64, footerY)
+
+  try {
+    const blob = await canvasToBlob(canvas)
     const result = await saveBlob(blob, `dongleme-${weekStart.value || 'summary'}.png`)
     toast(result === 'ok' ? '海报已保存' : '保存失败，请重试')
-  }, 'image/png')
+  } catch {
+    toast('海报生成失败')
+  }
 }
 
 onMounted(peek)
