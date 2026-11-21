@@ -125,14 +125,15 @@ public class AuthService {
         AccountLookup lookup = findUser(account);
         String password = request.password() == null ? "" : request.password();
 
-        boolean matched = lookup.user() != null
-                && passwordEncoder.matches(password, lookup.user().getPasswordHash());
         if (lookup.user() == null) {
             // 账号不存在时消耗等量时间，避免通过响应延迟枚举账号
             passwordEncoder.matches(password, decoyHash);
+            loginThrottle.recordFailure(clientIp, account);
+            // 产品明确要求区分提示：账号不存在时提示「用户不存在」
+            throw ApiException.unauthorized("用户不存在");
         }
 
-        if (!matched) {
+        if (!passwordEncoder.matches(password, lookup.user().getPasswordHash())) {
             loginThrottle.recordFailure(clientIp, account);
             throw ApiException.unauthorized("账号或密码错误");
         }

@@ -40,6 +40,15 @@ app:
     window-seconds: ${LOGIN_WINDOW_SECONDS:900}
   weather:
     amap-key: ${AMAP_KEY:}
+  android:
+    # 正式包版本信息；发新版时同步修改这里并上传 APK
+    version-code: ${APP_ANDROID_VERSION_CODE:2}
+    version-name: ${APP_ANDROID_VERSION_NAME:1.1}
+    # 二选一：apk-url 填外链（Gitee/对象存储），apk-path 填服务器本地 APK 路径
+    apk-url: ${APP_ANDROID_APK_URL:}
+    apk-path: ${APP_ANDROID_APK_PATH:}
+    notes: ${APP_ANDROID_NOTES:新增高德融合定位与轨迹地图跟随，修复排行榜与图标显示问题。}
+    force: ${APP_ANDROID_FORCE:false}
   llm:
     url: ${LLM_API_URL:}
     key: ${LLM_API_KEY:}
