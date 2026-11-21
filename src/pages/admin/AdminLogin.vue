@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import {
   ArrowLeft,
   ArrowRight,
+  Eye,
+  EyeOff,
   LayoutDashboard,
   Lock,
   Route as RouteIcon,
@@ -19,6 +21,7 @@ const router = useRouter()
 const form = ref({ account: '', password: '' })
 const loading = ref(false)
 const errorText = ref('')
+const showPassword = ref(false)
 
 function mapError(error) {
   return errorMessage(error, '登录失败，请稍后再试')
@@ -99,10 +102,19 @@ async function submit() {
               <Lock :size="18" class="admin-login__icon" />
               <input
                 v-model="form.password"
-                type="password"
+                :type="showPassword ? 'text' : 'password'"
                 placeholder="密码"
                 autocomplete="current-password"
               />
+              <button
+                type="button"
+                class="admin-login__eye"
+                :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+                @click="showPassword = !showPassword"
+              >
+                <EyeOff v-if="showPassword" :size="18" />
+                <Eye v-else :size="18" />
+              </button>
             </div>
           </div>
 
@@ -132,6 +144,17 @@ async function submit() {
 .admin-login__icon {
   flex: 0 0 auto;
   color: var(--muted);
+}
+
+.admin-login__eye {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #94a3b8;
+  cursor: pointer;
 }
 
 .admin-login__submit {
