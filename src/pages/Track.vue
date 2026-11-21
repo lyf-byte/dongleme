@@ -52,7 +52,8 @@ const {
   finish,
   reset,
   resumeDraft,
-  discardDraft
+  discardDraft,
+  refreshPosition
 } = useTracker()
 
 const { recent, loading: loadingRoutes, load: loadRecent } = useRouteHistory(8)
@@ -73,6 +74,10 @@ const profile = ref(null)
 const mapMissing = ref(false)
 const saving = ref(false)
 const saveError = ref('')
+const mapRef = ref(null)
+const refreshing = ref(false)
+const refreshNote = ref('')
+let refreshNoteTimer = null
 
 const isLive = computed(() => ['tracking', 'paused'].includes(status.value))
 const isFinished = computed(() => status.value === 'finished')
@@ -100,6 +105,23 @@ const gpsLabel = computed(() => ({
   fair: 'GPS 一般',
   weak: 'GPS 较弱'
 }[gpsState.value] || 'GPS'))
+const gpsWaitingLong = computed(() => (
+  status.value === 'tracking'
+  && points.value.length === 0
+  && duration.value >= 12
+))
+const gpsText = computed(() => {
+  if (refreshing.value) return '正在刷新定位…'
+  if (refreshNote.value) return refreshNote.value
+  if (gpsWaitingLong.value) return 'GPS 待定位 · 请到户外'
+  return gpsLabel.value
+})
+const gpsChipState = computed(() => {
+  if (refreshNote.value.startsWith('已刷新 · GPS 良好')) return 'good'
+  if (refreshNote.value.startsWith('已刷新 · GPS 一般')) return 'fair'
+  if (refreshing.value || refreshNote.value || gpsWaitingLong.value) return 'waiting'
+  return gpsState.value
+})
 const canSaveSummary = computed(() => (
   points.value.length >= 2 && distance.value >= 50 && duration.value >= 60
 ))
@@ -113,6 +135,43 @@ async function loadProfile() {
     profile.value = await getProfile()
   } catch {
     /* 热量估算使用默认体重 */
+  }
+}
+
+function setRefreshNote(text) {
+  refreshNote.value = text
+  clearTimeout(refreshNoteTimer)
+  refreshNoteTimer = setTimeout(() => {
+    refreshNote.value = ''
+  }, 5000)
+}
+
+async function refreshLocation() {
+  if (refreshing.value) return
+  refreshing.value = true
+  mapRef.value?.recenter()
+  try {
+    const result = isLive.value
+      ? await refreshPosition(10000)
+      : await locatePreview()
+    if (!result) {
+      toast('暂未获取到新的定位，请到开阔处重试')
+      return
+    }
+    mapRef.value?.recenter()
+    const acc = Number(result.acc)
+    if (Number.isFinite(acc) && acc > 50) {
+      setRefreshNote('室内定位 · 精度较低')
+      toast(`已获取位置，室内精度约 ±${Math.round(acc)}m，到户外会自动变准`)
+    } else if (Number.isFinite(acc) && acc > 0 && acc <= 15) {
+      setRefreshNote('已刷新 · GPS 良好')
+    } else {
+      setRefreshNote('已刷新 · GPS 一般')
+    }
+  } catch {
+    toast('暂未获取到新的定位，请到开阔处重试')
+  } finally {
+    refreshing.value = false
   }
 }
 
@@ -240,6 +299,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  clearTimeout(refreshNoteTimer)
 })
 
 onBeforeRouteLeave(async (to, from, next) => {
@@ -266,13 +326,26 @@ onBeforeRouteLeave(async (to, from, next) => {
     <template v-if="isLive">
       <div class="track-live">
         <RouteMap
+          ref="mapRef"
           :points="points"
           mode="live"
           :follow="true"
           :center="previewCenter"
           class="track-live__map"
           @missing-key="mapMissing = true"
+          @ready="mapMissing = false"
         />
+
+        <button
+          v-if="!mapMissing"
+          type="button"
+          class="track-refresh track-refresh--live"
+          :disabled="refreshing"
+          @click="refreshLocation"
+        >
+          <Navigation :size="14" />
+          {{ refreshing ? '正在刷新' : '刷新定位' }}
+        </button>
 
         <div class="track-live__top">
           <button type="button" class="track-round" aria-label="返回" @click="router.back()">
@@ -282,7 +355,7 @@ onBeforeRouteLeave(async (to, from, next) => {
             <strong>{{ sport }}</strong>
             <span>{{ status === 'paused' ? '已暂停' : '正在记录' }}</span>
           </div>
-          <span class="gps-chip" :class="'gps-chip--' + gpsState">{{ gpsLabel }}</span>
+          <span class="gps-chip" :class="'gps-chip--' + gpsChipState">{{ gpsText }}</span>
         </div>
 
         <div class="track-live__bottom">
@@ -399,6 +472,7 @@ onBeforeRouteLeave(async (to, from, next) => {
 
       <section class="track-hero">
         <RouteMap
+          ref="mapRef"
           :points="[]"
           mode="detail"
           :follow="false"
@@ -411,6 +485,16 @@ onBeforeRouteLeave(async (to, from, next) => {
           <Navigation :size="13" />
           {{ locateLabel }}
         </span>
+        <button
+          v-if="!mapMissing"
+          type="button"
+          class="track-refresh track-refresh--idle"
+          :disabled="refreshing"
+          @click="refreshLocation"
+        >
+          <Navigation :size="13" />
+          {{ refreshing ? '正在刷新' : '刷新定位' }}
+        </button>
       </section>
 
       <div v-if="mapMissing" class="track-notice">
@@ -606,6 +690,40 @@ onBeforeRouteLeave(async (to, from, next) => {
 .gps-chip--weak,
 .gps-chip--waiting {
   color: #64748b;
+}
+
+.track-refresh {
+  position: absolute;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(47, 107, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #2f6bff;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(15, 35, 95, 0.16);
+}
+
+.track-refresh:disabled {
+  opacity: 0.72;
+}
+
+.track-refresh--live {
+  top: 84px;
+  right: 16px;
+}
+
+.track-refresh--idle {
+  top: 12px;
+  right: 12px;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 11px;
 }
 
 .track-live__bottom {

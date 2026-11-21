@@ -21,20 +21,28 @@ export function useLocateProbe() {
   function probe() {
     if (!('geolocation' in navigator)) {
       state.value = 'failed'
-      return
+      return Promise.resolve(null)
     }
     state.value = 'locating'
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const gcj = wgs84ToGcj02(position.coords.longitude, position.coords.latitude)
-        center.value = [gcj.lng, gcj.lat]
-        state.value = 'ready'
-      },
-      () => {
-        state.value = 'failed'
-      },
-      { enableHighAccuracy: true, maximumAge: 30000, timeout: 10000 }
-    )
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const gcj = wgs84ToGcj02(position.coords.longitude, position.coords.latitude)
+          center.value = [gcj.lng, gcj.lat]
+          state.value = 'ready'
+          resolve({
+            lng: gcj.lng,
+            lat: gcj.lat,
+            acc: Number(position.coords.accuracy)
+          })
+        },
+        () => {
+          state.value = 'failed'
+          resolve(null)
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      )
+    })
   }
 
   return { state, center, label, probe }

@@ -227,8 +227,13 @@ async function init() {
 
 function recenter() {
   manualMove.value = false
+  if (!map) return
   const path = validPath()
-  if (map && path.length) map.setZoomAndCenter(17, path[path.length - 1])
+  if (path.length) {
+    map.setZoomAndCenter(17, path[path.length - 1])
+  } else if (props.center) {
+    map.setZoomAndCenter(16, props.center)
+  }
 }
 
 watch(() => props.points, () => draw(false))

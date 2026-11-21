@@ -1,6 +1,6 @@
 const EARTH_RADIUS_METERS = 6371000
 
-export const MAX_ACCURACY_METERS = 50
+export const MAX_ACCURACY_METERS = 30
 export const MAX_POINTS = 5000
 
 export function haversineMeters(lat1, lng1, lat2, lng2) {
@@ -29,7 +29,13 @@ export function shouldAcceptPoint(point, previous, sport) {
   if (!previous) return true
 
   const gap = haversineMeters(previous.lat, previous.lng, point.lat, point.lng)
-  if (gap < 2) return false
+  // 精度越差，要求的最小位移越大，过滤原地漂移造成的锯齿
+  const accuracy = Math.min(
+    Number.isFinite(previous.acc) ? previous.acc : 0,
+    Number.isFinite(point.acc) ? point.acc : 0
+  )
+  const minGap = accuracy > 0 ? Math.max(2, Math.min(6, accuracy * 0.35)) : 2
+  if (gap < minGap) return false
 
   const deltaTime = point.t - previous.t
   if (deltaTime <= 0) return false

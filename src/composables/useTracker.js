@@ -217,6 +217,44 @@ export function useTracker() {
     error.value = '定位超时，正在等待下一次更新'
   }
 
+  /** 主动取一次高精度定位，用于「刷新定位」按钮；记录中会顺带补一个点。 */
+  function refreshPosition(timeout = 10000) {
+    return new Promise((resolve, reject) => {
+      if (!('geolocation' in navigator)) {
+        reject(new Error('unsupported'))
+        return
+      }
+      let settled = false
+      const timer = setTimeout(() => {
+        if (settled) return
+        settled = true
+        reject(new Error('timeout'))
+      }, timeout)
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          const acc = Number(position.coords.accuracy)
+          applyPosition(
+            position.coords.latitude,
+            position.coords.longitude,
+            acc,
+            Date.now()
+          )
+          resolve({ lat: current.value?.lat, lng: current.value?.lng, acc })
+        },
+        (geoError) => {
+          if (settled) return
+          settled = true
+          clearTimeout(timer)
+          reject(geoError)
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout }
+      )
+    })
+  }
+
   function startTimer() {
     stopTimer()
     timer = setInterval(() => {
@@ -481,6 +519,7 @@ export function useTracker() {
     endedAt,
     pointLimitReached,
     canSave,
+    refreshPosition,
     loadDraft,
     start,
     pause,
