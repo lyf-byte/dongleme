@@ -43,41 +43,31 @@ scp dongleme.apk ubuntu@<服务器>:/opt/donglemei/site/download/
 
 `app.js` 里也有一处，是 APK 缺失时的兜底跳转地址。
 
-## 部署
+## 部署（已上线）
 
-推荐**独立子域名**，和 App 互不干扰：
+当前线上布局：
 
 ```
-www.dongleme.xyz  ->  官网（site/）
-dongleme.xyz      ->  App（dist/）
+www.dongleme.xyz  ->  官网（/opt/donglemei/site）
+dongleme.xyz      ->  App（/opt/donglemei/dist）
 ```
 
-Caddyfile 追加一个站点块：
+Caddy 里是两个独立的站点块，App 那一块保留原来的 `/api/*` 反代和 CSP，官网这一块只管静态文件。
 
-```caddy
-www.dongleme.xyz {
-    root * /opt/donglemei/site
-    encode zstd gzip
-    try_files {path} {path}/ /index.html
-    file_server
-    header {
-        X-Content-Type-Options nosniff
-        Referrer-Policy strict-origin-when-cross-origin
-    }
-}
-```
-
-上传与重载：
+更新官网：
 
 ```bash
-rsync -av --delete site/ ubuntu@<服务器>:/opt/donglemei/site/
-sudo systemctl reload caddy
+scp -r -i ~/.ssh/<key> site ubuntu@<服务器>:/opt/donglemei/
 ```
 
-DNS 那边给 `www` 加一条 A 记录指向同一台机器即可，证书会自动签发。
+不需要 reload caddy —— 静态文件直接覆盖即可生效（`index.html` 设了 `no-cache`，`assets/` 缓存 30 天，文件名不变的话改图要改引用或加版本号）。
 
-> 想让官网占据根域名、App 挪到 `/app` 也可以，但需要改 `vite.config.js` 的 `base` 和
-> `createWebHistory('/app')`，还要处理 PWA 的 scope，改动面比较大，不如子域名干净。
+改 Caddy 配置时：
+
+```bash
+sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+sudo systemctl reload caddy
+```
 
 ## 素材来源
 
