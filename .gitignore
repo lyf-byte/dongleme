@@ -31,3 +31,6 @@ npm-debug.log*
 /打卡海报.png
 /运动轨迹海报.png
 /ai小结海报.png
+
+# 官网的 APK 产物，单独上传不提交
+/site/download/*.apk

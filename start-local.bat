@@ -18,7 +18,7 @@ for /f "usebackq eol=# tokens=1,* delims==" %%a in (".env") do (
 if not defined DB_HOST set "DB_HOST=127.0.0.1"
 if not defined SERVER_PORT set "SERVER_PORT=8080"
 
-echo [1/3] Checking SSH tunnel...
+echo [1/4] Checking SSH tunnel...
 call :port_open 13306
 if errorlevel 1 (
     if not defined DEPLOY_HOST goto :tunnel_skip
@@ -44,11 +44,16 @@ echo       DEPLOY_HOST / DEPLOY_SSH_KEY not configured, skip tunnel
 
 :tunnel_done
 
-echo [2/3] Checking backend...
+echo [2/4] Checking backend...
 call :port_open 8080
 if errorlevel 1 (
-    if not exist "backend-spring\target\dongleme-backend.jar" (
-        echo       jar not found, building backend...
+    set "JAR=backend-spring\target\dongleme-backend.jar"
+    set "NEED_BUILD=0"
+    if not exist "%JAR%" set "NEED_BUILD=1"
+    rem A runnable jar is a ~30MB fat jar. A few hundred KB means repackage failed.
+    if exist "%JAR%" for %%A in ("%JAR%") do if %%~zA LSS 5000000 set "NEED_BUILD=1"
+    if "%NEED_BUILD%"=="1" (
+        echo       jar missing or invalid, building backend...
         pushd backend-spring
         call mvn -B -DskipTests package
         if errorlevel 1 (
@@ -71,7 +76,7 @@ if errorlevel 1 (
     echo       port 8080 already listening, skip backend
 )
 
-echo [3/3] Checking frontend...
+echo [3/4] Checking frontend...
 call :port_open 5173
 if errorlevel 1 (
     start "dongleme-frontend" /min cmd /c "npm run dev -- --host 127.0.0.1 > .run\frontend.log 2>&1"
@@ -86,12 +91,37 @@ if errorlevel 1 (
     echo       port 5173 already listening, skip frontend
 )
 
+echo [4/4] Checking website...
+call :port_open 4321
+if errorlevel 1 (
+    if not exist "site\index.html" (
+        echo       site\index.html not found, skip website
+    ) else (
+        where python >nul 2>&1
+        if errorlevel 1 (
+            echo       python not found, skip website
+        ) else (
+            start "dongleme-site" /min /d "site" cmd /c "python -m http.server 4321 --bind 127.0.0.1 > ..\.run\site.log 2>&1"
+            echo       website starting...
+            call :wait_port 4321 15
+            if errorlevel 1 (
+                echo       website not ready in 15s, see .run\site.log
+            ) else (
+                echo       website ready at 127.0.0.1:4321
+            )
+        )
+    )
+) else (
+    echo       port 4321 already listening, skip website
+)
+
 echo.
 echo ============================================
 echo   frontend  http://127.0.0.1:5173
 echo   admin     http://127.0.0.1:5173/admin
+echo   website   http://127.0.0.1:4321
 echo   backend   http://127.0.0.1:8080/api/health
-echo   logs      .run\backend.log / .run\frontend.log
+echo   logs      .run\backend.log / .run\frontend.log / .run\site.log
 echo   stop      stop-local.bat
 echo ============================================
 pause

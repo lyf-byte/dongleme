@@ -7,6 +7,7 @@ set "found=0"
 
 call :kill_port 8080 backend
 call :kill_port 5173 frontend
+call :kill_port 4321 website
 call :kill_port 13306 ssh-tunnel
 
 if "%found%"=="0" echo No running services found.

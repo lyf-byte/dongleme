@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>动了么 · 校园运动打卡</title>
+<meta name="description" content="动了么是一款校园运动打卡应用：记录运动、连续打卡、GPS 轨迹、AI 周小结，还能一键生成好看的海报。">
+<meta name="theme-color" content="#070c18">
+<meta property="og:title" content="动了么 · 每天动一点，连续看得见">
+<meta property="og:description" content="运动打卡、GPS 轨迹、AI 周小结，把「坚持」变成看得见的东西。">
+<meta property="og:image" content="assets/poster-checkin.jpg">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="grain" aria-hidden="true"></div>
+
+<header class="nav" id="nav">
+  <div class="nav__inner">
+    <a class="brand" href="#top">
+      <img src="assets/logo.svg" alt="" width="30" height="30">
+      <span>动了么</span>
+    </a>
+    <nav class="nav__links">
+      <a href="#features">功能</a>
+      <a href="#showcase">海报</a>
+      <a href="#download">下载</a>
+    </nav>
+    <a class="nav__cta" href="https://dongleme.xyz">开始体验</a>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <div class="hero__photo" aria-hidden="true"></div>
+    <div class="hero__bloom" aria-hidden="true"></div>
+
+    <div class="wrap hero__inner">
+      <div class="hero__copy">
+        <p class="hero__eyebrow reveal">校园运动打卡 · 给坚持做个记录</p>
+        <h1 class="reveal" style="--d:.06s">
+          每天动一点<br>
+          <em>连续看得见</em>
+        </h1>
+        <p class="lead reveal" style="--d:.12s">
+          记录每一次运动。连续天数会往上走，卡路里会算清楚，
+          跑完还有一张能直接发出去的海报。
+        </p>
+        <div class="hero__actions reveal" style="--d:.18s">
+          <a class="btn btn--primary" href="#download">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
+            下载 Android 版
+          </a>
+          <a class="btn btn--ghost" href="https://dongleme.xyz">
+            在线体验
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+          </a>
+        </div>
+        <p class="hero__note reveal" style="--d:.24s">完全免费 · Web 端免安装 · 数据只存在自己的服务器</p>
+      </div>
+
+      <figure class="hero__figure reveal" style="--d:.1s">
+        <div class="stack">
+          <img class="stack__back" src="assets/poster-track.jpg" alt="运动轨迹海报">
+          <img class="stack__front" src="assets/poster-checkin.jpg" alt="打卡海报">
+        </div>
+        <figcaption>打卡海报 · 运动结束后自动生成</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee__track">
+      <span>跑步</span><span>快走</span><span>骑行</span><span>跳绳</span><span>游泳</span><span>力量训练</span><span>羽毛球</span><span>自定义</span>
+      <span>跑步</span><span>快走</span><span>骑行</span><span>跳绳</span><span>游泳</span><span>力量训练</span><span>羽毛球</span><span>自定义</span>
+    </div>
+  </div>
+
+  <section class="section" id="features">
+    <div class="wrap">
+      <header class="section__head">
+        <span class="eyebrow eyebrow--dark reveal"><i></i>功能</span>
+        <h2 class="reveal" style="--d:.05s">该记的它都替你记好了</h2>
+        <p class="reveal" style="--d:.1s">不用自己做表格，也不用回忆今天练了多久。</p>
+      </header>
+
+      <div class="cards">
+        <article class="card card--feature reveal">
+          <span class="card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+          </span>
+          <h3>连续打卡</h3>
+          <p>断一天就清零。看着数字往上走，比任何提醒都管用。</p>
+          <div class="streak">
+            <p class="streak__num">12<i>天</i></p>
+            <ol class="streak__days" aria-hidden="true">
+              <li class="on"><b>16</b></li><li class="on"><b>17</b></li><li class="off"><b>18</b></li>
+              <li class="on"><b>19</b></li><li class="on"><b>20</b></li><li class="off"><b>21</b></li>
+              <li class="now"><b>22</b></li>
+            </ol>
+            <p class="streak__foot">本周 5 次 · 累计 46 天</p>
+          </div>
+        </article>
+        <article class="card card--amber reveal">
+          <span class="card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.09 12.97a1 1 0 0 0 .77 1.64H11l-1 7.39 8.91-10.97a1 1 0 0 0-.77-1.64H12z"/></svg>
+          </span>
+          <h3>热量自动算</h3>
+          <p>按 MET 公式结合体重、性别系数估算消耗，填个时长就行。</p>
+        </article>
+        <article class="card card--green reveal" style="--d:.1s">
+          <span class="card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.686-7-11a7 7 0 1 1 14 0c0 5.314-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+          </span>
+          <h3>GPS 轨迹</h3>
+          <p>跑步骑行全程记录，切到后台也不断，回来自动补齐点位。</p>
+        </article>
+        <article class="card card--violet reveal" style="--d:.15s">
+          <span class="card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M3 12h3M18 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/><circle cx="12" cy="12" r="3.2"/></svg>
+          </span>
+          <h3>AI 周小结</h3>
+          <p>每周自动写一段回顾，指出节奏问题，给下一周的建议。</p>
+        </article>
+        <article class="card card--orange reveal" style="--d:.2s">
+          <span class="card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v6a5 5 0 0 1-10 0z"/><path d="M17 5h2a2 2 0 0 1 0 4h-.5M7 5H5a2 2 0 0 0 0 4h.5"/></svg>
+          </span>
+          <h3>校园周榜</h3>
+          <p>本周 Top 20，看看同一所学校里，谁这周动得最久。</p>
+        </article>
+        <article class="card card--cyan reveal" style="--d:.25s">
+          <span class="card__icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.2 10.4 3.8 3.8 0 0 0 7 19z"/><path d="M12 12v5M9.5 14.5 12 12l2.5 2.5"/></svg>
+          </span>
+          <h3>天气建议</h3>
+          <p>结合实时天气与空气质量，告诉你今天适不适合去户外。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--tint" id="showcase">
+    <div class="wrap">
+      <header class="section__head">
+        <span class="eyebrow eyebrow--dark reveal"><i></i>海报</span>
+        <h2 class="reveal" style="--d:.05s">动完就有一张能发的图</h2>
+        <p class="reveal" style="--d:.1s">打卡、轨迹、周小结，各自生成一张，不用再自己拼图。</p>
+      </header>
+
+      <div class="showcase">
+        <figure class="shot reveal">
+          <div class="shot__frame"><img src="assets/poster-checkin.jpg" alt="打卡海报" loading="lazy"></div>
+          <figcaption>
+            <strong>打卡海报</strong>
+            <span>日期、时长、热量、连续天数，一次打卡就有一张。</span>
+          </figcaption>
+        </figure>
+
+        <figure class="shot reveal" style="--d:.08s">
+          <div class="shot__frame"><img src="assets/poster-track.jpg" alt="运动轨迹海报" loading="lazy"></div>
+          <figcaption>
+            <strong>轨迹海报</strong>
+            <span>跑完的路线、配速和消耗，全部标在一张图上。</span>
+          </figcaption>
+        </figure>
+
+        <figure class="shot reveal" style="--d:.16s">
+          <div class="shot__frame"><img src="assets/poster-summary.jpg" alt="周小结海报" loading="lazy"></div>
+          <figcaption>
+            <strong>周小结海报</strong>
+            <span>一周的数据，加上 AI 教练写的那段话。</span>
+          </figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <header class="section__head">
+        <span class="eyebrow eyebrow--dark reveal"><i></i>怎么用</span>
+        <h2 class="reveal" style="--d:.05s">三步，一分钟</h2>
+      </header>
+
+      <ol class="steps">
+        <li class="step reveal">
+          <span class="step__dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 12h10"/><path d="M4 17h13"/></svg></span>
+          <h3>选一种运动</h3>
+          <p>内置七种常见项目，也能自己加，填好 MET 就行。</p>
+        </li>
+        <li class="step reveal" style="--d:.08s">
+          <span class="step__dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2"/><path d="M9 2h6"/></svg></span>
+          <h3>计时或记录轨迹</h3>
+          <p>用页内计时器，或者开 GPS 让它在后台跑完全程。</p>
+        </li>
+        <li class="step reveal" style="--d:.16s">
+          <span class="step__dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="9.5" r="1.6"/><path d="m4 17 5-4 4 3 3-2.5 4 3.5"/></svg></span>
+          <h3>保存并生成海报</h3>
+          <p>确认打卡，顺手把这一张存进相册。</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="cta" id="download">
+    <div class="wrap">
+      <div class="cta__card reveal">
+        <div class="cta__glow" aria-hidden="true"></div>
+        <div class="cta__main">
+          <div class="cta__copy">
+            <h2>现在就开始</h2>
+            <p>装上 App，或者直接在浏览器里用。今天动十分钟也算。</p>
+          </div>
+          <div class="cta__actions">
+            <a class="btn btn--primary btn--lg" id="apk" href="download/dongleme.apk" download>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
+              <span id="apk-label">下载 Android 版</span>
+            </a>
+            <a class="btn btn--ghost btn--lg" href="https://dongleme.xyz">
+              网页版直接体验
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+            </a>
+          </div>
+          <p class="cta__meta">Web 端免安装，手机上「添加到主屏幕」就能像 App 一样用。</p>
+        </div>
+        <div class="cta__visual" aria-hidden="true">
+          <img src="assets/poster-track.jpg" alt="">
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer__inner">
+    <div class="footer__brand">
+      <img src="assets/logo.svg" alt="" width="30" height="30">
+      <div>
+        <span>动了么</span>
+        <small>校园运动打卡</small>
+      </div>
+    </div>
+    <nav class="footer__links">
+      <a href="https://dongleme.xyz">在线体验</a>
+      <a href="#download">下载</a>
+      <a href="https://dongleme.xyz/admin/login">管理后台</a>
+    </nav>
+    <div class="footer__bar">
+      <p>© 2026 动了么 · 每天动一点，连续看得见</p>
+      <a href="#top">回到顶部 ↑</a>
+    </div>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
