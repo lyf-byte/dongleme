@@ -13,7 +13,11 @@ const backupPath = process.argv[2] || '/opt/donglemei/backup-supabase-2026-11-19
 const backup = JSON.parse(fs.readFileSync(backupPath, 'utf8'))
 
 const authMap = new Map((backup.authUsers || []).map((user) => [user.id, user]))
-const TEMP_PASSWORD = 'Dlm@123456'
+const TEMP_PASSWORD = process.env.MIGRATE_TEMP_PASSWORD
+if (!TEMP_PASSWORD) {
+  console.error('请通过 MIGRATE_TEMP_PASSWORD 环境变量提供临时密码')
+  process.exit(1)
+}
 const passwordHash = await bcrypt.hash(TEMP_PASSWORD, 10)
 
 const toDate = (value) => (value ? String(value).slice(0, 10) : null)
@@ -112,7 +116,7 @@ try {
     summaries += 1
   }
 
-  console.log(JSON.stringify({ users, records, summaries, tempPassword: TEMP_PASSWORD }))
+  console.log(JSON.stringify({ users, records, summaries }))
 } finally {
   await conn.end()
 }
