@@ -1,6 +1,7 @@
 package com.dongleme.backend.controller;
 
 import com.dongleme.backend.common.ApiException;
+import com.dongleme.backend.dto.NextGoalRequest;
 import com.dongleme.backend.dto.ProfileUpdateRequest;
 import com.dongleme.backend.security.AuthUser;
 import com.dongleme.backend.service.ProfileService;
@@ -41,6 +42,13 @@ public class ProfileController {
             @AuthenticationPrincipal AuthUser principal,
             @RequestBody ProfileUpdateRequest request) {
         return profileService.update(requireId(principal), request);
+    }
+
+    @PutMapping("/next-goal")
+    public Map<String, Object> nextGoal(
+            @AuthenticationPrincipal AuthUser principal,
+            @RequestBody NextGoalRequest request) {
+        return profileService.setNextWeeklyGoal(requireId(principal), request.weeklyGoal());
     }
 
     @DeleteMapping

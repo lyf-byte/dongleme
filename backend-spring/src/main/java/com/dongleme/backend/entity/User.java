@@ -35,6 +35,12 @@ public class User {
     @TableField("weekly_goal")
     private Integer weeklyGoal;
 
+    @TableField("next_weekly_goal")
+    private Integer nextWeeklyGoal;
+
+    @TableField("next_goal_week")
+    private LocalDate nextGoalWeek;
+
     @TableField("is_admin")
     private Boolean isAdmin;
 

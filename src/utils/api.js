@@ -242,6 +242,12 @@ export async function updateProfile(payload) {
   return result
 }
 
+export async function setNextWeeklyGoal(weeklyGoal) {
+  const result = await api.put('/profile/next-goal', { weeklyGoal }).then((res) => res.data)
+  clearApiCache()
+  return result
+}
+
 export async function clearRecords() {
   const result = await api.delete('/profile').then((res) => res.data)
   clearApiCache()

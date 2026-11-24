@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
   gender VARCHAR(10) NOT NULL DEFAULT 'secret',
   weight DECIMAL(5, 2) NOT NULL DEFAULT 60,
   weekly_goal INT NOT NULL DEFAULT 150,
+  next_weekly_goal INT NULL,
+  next_goal_week DATE NULL,
   is_admin TINYINT(1) NOT NULL DEFAULT 0,
   onboarded TINYINT(1) NOT NULL DEFAULT 0,
   streak INT NOT NULL DEFAULT 0,
@@ -131,3 +133,4 @@ CREATE TABLE IF NOT EXISTS follows (
 -- 迁移（已有库执行一次）：
 -- ALTER TABLE records ADD COLUMN source VARCHAR(16) NOT NULL DEFAULT 'manual', ADD COLUMN verified TINYINT NOT NULL DEFAULT 0, ADD COLUMN flagged TINYINT NOT NULL DEFAULT 0;
 -- ALTER TABLE summaries ADD COLUMN plan_goal INT NULL;
+-- ALTER TABLE users ADD COLUMN next_weekly_goal INT NULL, ADD COLUMN next_goal_week DATE NULL;

@@ -2,6 +2,7 @@ package com.dongleme.backend.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.dongleme.backend.common.ApiException;
+import com.dongleme.backend.common.ShanghaiTime;
 import com.dongleme.backend.dto.AuthRequest;
 import com.dongleme.backend.dto.AuthResponse;
 import com.dongleme.backend.dto.AuthUpdateRequest;
@@ -16,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -69,7 +71,31 @@ public class AuthService {
         if (user == null) {
             throw ApiException.unauthorized("登录已过期，请重新登录");
         }
-        return user;
+        return applyDueGoal(user);
+    }
+
+    /**
+     * 「设为下周目标」存的是待生效值，到生效周自动切换为当前周目标。
+     * 只在到期后的第一次读取时写一次库，之后 pending 字段已清空。
+     */
+    private User applyDueGoal(User user) {
+        Integer nextGoal = user.getNextWeeklyGoal();
+        LocalDate dueWeek = user.getNextGoalWeek();
+        if (nextGoal == null
+                || dueWeek == null
+                || dueWeek.isAfter(ShanghaiTime.weekStart(ShanghaiTime.today()))) {
+            return user;
+        }
+
+        userMapper.update(null, Wrappers.<User>lambdaUpdate()
+                .eq(User::getId, user.getId())
+                .set(User::getWeeklyGoal, nextGoal)
+                .set(User::getNextWeeklyGoal, null)
+                .set(User::getNextGoalWeek, null));
+        userLookupCache.invalidate(user.getId());
+
+        User refreshed = userLookupCache.get(user.getId());
+        return refreshed == null ? user : refreshed;
     }
 
     public Map<String, Object> update(AuthUpdateRequest request, String userId) {

@@ -11,6 +11,7 @@ public record ProfileView(
         String gender,
         double weight,
         Integer weeklyGoal,
+        Integer nextWeeklyGoal,
         int streak,
         @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime createdAt,
         int weekMinutes,

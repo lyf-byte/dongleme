@@ -127,6 +127,7 @@ public class ProfileService {
                 basic.gender(),
                 basic.weight(),
                 basic.weeklyGoal(),
+                user.getNextWeeklyGoal(),
                 basic.streak(),
                 basic.createdAt(),
                 weekMinutes,
@@ -199,9 +200,27 @@ public class ProfileService {
         );
     }
 
-    @Transactional
-    public Map<String, Object> clear(String userId) {
+    /**
+     * 把 AI 小结给出的目标存为「下周目标」，到下周一时由 requireUser 自动切换为当前周目标。
+     */
+    public Map<String, Object> setNextWeeklyGoal(String userId, Integer weeklyGoal) {
+        if (weeklyGoal == null || weeklyGoal < 1 || weeklyGoal > 2000) {
+            throw ApiException.badRequest("周目标需为 1–2000 的整数");
+        }
         authService.requireUser(userId);
+
+        LocalDate nextWeek = ShanghaiTime.weekStart(ShanghaiTime.today()).plusWeeks(1);
+        userMapper.update(null, Wrappers.<User>lambdaUpdate()
+                .eq(User::getId, userId)
+                .set(User::getNextWeeklyGoal, weeklyGoal)
+                .set(User::getNextGoalWeek, nextWeek));
+        userLookupCache.invalidate(userId);
+
+        return Map.of("nextWeeklyGoal", weeklyGoal, "nextGoalWeek", nextWeek.toString());
+    }
+
+    @Transactional
+    public Map<String, Object> clear(String userId) {        authService.requireUser(userId);
 
         routeMapper.delete(
                 Wrappers.<ActivityRoute>lambdaQuery().eq(ActivityRoute::getUserId, userId));

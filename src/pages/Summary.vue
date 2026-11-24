@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { Copy, Download, RefreshCw, Sparkles } from 'lucide-vue-next'
-import { generateSummary, getProfile, updateProfile, errorMessage } from '../utils/api'
+import { generateSummary, getProfile, setNextWeeklyGoal, errorMessage } from '../utils/api'
 import { toast } from '../utils/ui'
 import { saveBlob } from '../utils/native'
 import emptySummary from '../assets/empty-summary.svg'
@@ -26,8 +26,13 @@ const profile = ref(null)
 const applying = ref(false)
 const errorText = ref('')
 
-const isCurrentGoal = computed(
-  () => Boolean(profile.value && planGoal.value && profile.value.weeklyGoal === planGoal.value)
+const isNextGoal = computed(
+  () =>
+    Boolean(
+      profile.value &&
+        planGoal.value &&
+        profile.value.nextWeeklyGoal === planGoal.value
+    )
 )
 
 const weekLabel = computed(() => {
@@ -166,14 +171,9 @@ async function applyPlan() {
     if (!profile.value) {
       profile.value = await getProfile()
     }
-    await updateProfile({
-      nickname: profile.value.nickname,
-      gender: profile.value.gender || 'secret',
-      weight: profile.value.weight,
-      weeklyGoal: planGoal.value
-    })
-    profile.value.weeklyGoal = planGoal.value
-    toast(`本周目标已更新为 ${planGoal.value} 分钟`)
+    await setNextWeeklyGoal(planGoal.value)
+    profile.value.nextWeeklyGoal = planGoal.value
+    toast(`已设为下周目标：${planGoal.value} 分钟 / 周，下周一生效`)
   } catch (error) {
     toast(errorMessage(error, '设置失败'))
   } finally {
@@ -230,10 +230,10 @@ onMounted(() => {
           <button
             type="button"
             class="btn-primary btn-sm"
-            :disabled="applying || isCurrentGoal"
+            :disabled="applying || isNextGoal"
             @click="applyPlan"
           >
-            {{ isCurrentGoal ? '已是本周目标' : applying ? '设置中…' : '设为本周目标' }}
+            {{ isNextGoal ? '已是下周目标' : applying ? '设置中…' : '设为下周目标' }}
           </button>
         </div>
 
