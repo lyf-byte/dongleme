@@ -1,7 +1,15 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Download, Route as RouteIcon, Trash2 } from 'lucide-vue-next'
+import {
+  ArrowLeft,
+  Download,
+  Pause,
+  Play,
+  RotateCcw,
+  Route as RouteIcon,
+  Trash2
+} from 'lucide-vue-next'
 import { deleteRoute, errorMessage, getRoute } from '../utils/api'
 import { SPORTS } from '../utils/sport'
 import { distanceParts, formatDuration, formatPace, formatSpeed } from '../utils/geo'
@@ -16,6 +24,7 @@ import {
   drawStatColumns,
   loadPosterImage
 } from '../utils/poster'
+import { buildSegments } from '../utils/routeSegments'
 import RouteMap from '../components/RouteMap.vue'
 
 const route = useRoute()
@@ -25,6 +34,21 @@ const loading = ref(true)
 const detail = ref(null)
 const errorText = ref('')
 const deleting = ref(false)
+
+const mapRef = ref(null)
+const playing = ref(false)
+const progress = ref(0)
+const REPLAY_MS = 16000
+let rafId = 0
+let lastTs = 0
+
+const segmentInfo = computed(() =>
+  buildSegments(detail.value?.points || [], detail.value?.type || '跑步')
+)
+const segments = computed(() => segmentInfo.value.segments)
+const elapsedSec = computed(() =>
+  detail.value ? Math.round(detail.value.durationSec * progress.value) : 0
+)
 
 const distanceView = computed(() => distanceParts(detail.value?.distanceM || 0))
 const currentSport = computed(
@@ -66,6 +90,52 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function applyProgress(value) {
+  const next = Math.max(0, Math.min(1, value))
+  progress.value = next
+  mapRef.value?.setProgress(next)
+}
+
+function step(ts) {
+  if (!playing.value) return
+  if (!lastTs) lastTs = ts
+  const delta = ts - lastTs
+  lastTs = ts
+  const next = Math.min(1, progress.value + delta / REPLAY_MS)
+  applyProgress(next)
+  if (next >= 1) {
+    playing.value = false
+    return
+  }
+  rafId = requestAnimationFrame(step)
+}
+
+function togglePlay() {
+  if (playing.value) {
+    playing.value = false
+    cancelAnimationFrame(rafId)
+    return
+  }
+  if (progress.value >= 1) applyProgress(0)
+  playing.value = true
+  lastTs = 0
+  rafId = requestAnimationFrame(step)
+}
+
+function onSeek(event) {
+  playing.value = false
+  cancelAnimationFrame(rafId)
+  applyProgress(Number(event.target.value) / 1000)
+}
+
+function resetReplay() {
+  playing.value = false
+  cancelAnimationFrame(rafId)
+  progress.value = 0
+  mapRef.value?.resetProgress()
+  mapRef.value?.focusTrack()
 }
 
 async function removeRoute() {
@@ -154,6 +224,8 @@ async function savePoster() {
 }
 
 onMounted(load)
+
+onUnmounted(() => cancelAnimationFrame(rafId))
 </script>
 
 <template>
@@ -192,8 +264,53 @@ onMounted(load)
 
     <template v-else-if="detail">
       <section class="detail-map">
-        <RouteMap :points="detail.points" mode="detail" :follow="false" />
+        <RouteMap
+          ref="mapRef"
+          :points="detail.points"
+          :segments="segments"
+          mode="detail"
+          :follow="false"
+        />
       </section>
+
+      <div class="replay">
+        <button
+          type="button"
+          class="replay__play"
+          :aria-label="playing ? '暂停回放' : '开始回放'"
+          @click="togglePlay"
+        >
+          <Pause v-if="playing" :size="15" />
+          <Play v-else :size="15" />
+        </button>
+        <input
+          class="replay__range"
+          type="range"
+          min="0"
+          max="1000"
+          step="1"
+          :value="Math.round(progress * 1000)"
+          aria-label="回放进度"
+          @input="onSeek"
+        />
+        <span class="replay__time">{{ formatDuration(elapsedSec) }}</span>
+        <button
+          v-if="progress > 0"
+          type="button"
+          class="replay__reset"
+          aria-label="重置回放"
+          @click="resetReplay"
+        >
+          <RotateCcw :size="14" />
+        </button>
+      </div>
+
+      <div v-if="segmentInfo.hasPace && segmentInfo.legend.length" class="legend">
+        <span v-for="item in segmentInfo.legend" :key="item.label" class="legend__item">
+          <i :style="{ background: item.color }"></i>{{ item.label }}
+        </span>
+        <span class="legend__hint">按{{ paceLabel }}着色</span>
+      </div>
 
       <section class="card detail-card">
         <div class="detail-head">
@@ -265,6 +382,108 @@ onMounted(load)
   overflow: hidden;
   background: #dbeafe;
   box-shadow: 0 14px 30px rgba(47, 107, 255, 0.12);
+}
+
+.replay {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.replay__play {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  cursor: pointer;
+}
+
+.replay__range {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 999px;
+  background: var(--blue-soft);
+  outline: none;
+}
+
+.replay__range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.24);
+  cursor: pointer;
+}
+
+.replay__range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--blue);
+  cursor: pointer;
+}
+
+.replay__time {
+  min-width: 40px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.replay__reset {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend__item i {
+  display: block;
+  width: 12px;
+  height: 3px;
+  border-radius: 999px;
+}
+
+.legend__hint {
+  margin-left: auto;
 }
 
 .detail-card {

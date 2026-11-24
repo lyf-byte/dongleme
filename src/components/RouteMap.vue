@@ -2,13 +2,16 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { MapPin } from 'lucide-vue-next'
 import { hasAmapKey, loadAmap } from '../utils/amap'
+import { cumulativeDistances } from '../utils/routeSegments'
 
 const props = defineProps({
   points: { type: Array, default: () => [] },
   mode: { type: String, default: 'live' },
   follow: { type: Boolean, default: true },
   sport: { type: String, default: '跑步' },
-  center: { type: Array, default: null }
+  center: { type: Array, default: null },
+  /* 按配速切好的分段，传入后替代单色线渲染 */
+  segments: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['ready', 'missing-key', 'error'])
@@ -26,6 +29,13 @@ let currentMarker = null
 let accuracyCircle = null
 let previewMarker = null
 let disposed = false
+
+let segmentLines = []
+let maskLine = null
+let progressMarker = null
+let progressPoints = []
+let progressDists = []
+let progressTotal = 0
 
 function validPath() {
   return (props.points || [])
@@ -104,6 +114,8 @@ function draw(fit = false) {
       map.remove(polyline)
       polyline = null
     }
+    clearSegmentLines()
+    resetProgress()
     if (startMarker) {
       map.remove(startMarker)
       startMarker = null
@@ -123,20 +135,29 @@ function draw(fit = false) {
     return
   }
 
-  if (!polyline) {
-    polyline = new AMapRef.Polyline({
-      path,
-      strokeColor: '#2f6bff',
-      strokeWeight: 6,
-      strokeOpacity: 0.92,
-      lineJoin: 'round',
-      lineCap: 'round',
-      showDir: true,
-      zIndex: 60
-    })
-    map.add(polyline)
+  if (props.segments.length) {
+    if (polyline) {
+      map.remove(polyline)
+      polyline = null
+    }
+    drawSegments()
   } else {
-    polyline.setPath(path)
+    clearSegmentLines()
+    if (!polyline) {
+      polyline = new AMapRef.Polyline({
+        path,
+        strokeColor: '#2f6bff',
+        strokeWeight: 6,
+        strokeOpacity: 0.92,
+        lineJoin: 'round',
+        lineCap: 'round',
+        showDir: true,
+        zIndex: 60
+      })
+      map.add(polyline)
+    } else {
+      polyline.setPath(path)
+    }
   }
 
   ensureMarker('start', path[0], '#16a34a', 7)
@@ -151,7 +172,7 @@ function draw(fit = false) {
       map.remove(accuracyCircle)
       accuracyCircle = null
     }
-    if (fit) map.setFitView([polyline], false, [60, 60, 60, 60])
+    if (fit) focusTrack()
     return
   }
 
@@ -191,6 +212,109 @@ function draw(fit = false) {
       map.setCenter(path[path.length - 1])
     }
   }
+}
+
+function clearSegmentLines() {
+  segmentLines.forEach((line) => map.remove(line))
+  segmentLines = []
+}
+
+function drawSegments() {
+  clearSegmentLines()
+  if (!map || !props.segments.length) return
+  props.segments.forEach((segment) => {
+    const line = new AMapRef.Polyline({
+      path: segment.path,
+      strokeColor: segment.color,
+      strokeWeight: 6,
+      strokeOpacity: 0.95,
+      lineJoin: 'round',
+      lineCap: 'round',
+      showDir: false,
+      zIndex: 60
+    })
+    map.add(line)
+    segmentLines.push(line)
+  })
+}
+
+function prepareProgress() {
+  progressPoints = (props.points || []).filter(
+    (point) => Number.isFinite(point?.lat) && Number.isFinite(point?.lng)
+  )
+  progressDists = cumulativeDistances(progressPoints)
+  progressTotal = progressDists[progressDists.length - 1] || 0
+}
+
+/** 回放：用灰色遮罩盖住未走过的部分，当前位置用圆点标记 */
+function setProgress(ratio) {
+  if (state.value !== 'ready' || !map) return
+  if (!progressPoints.length) prepareProgress()
+  if (!progressPoints.length) return
+
+  const clamped = Math.max(0, Math.min(1, ratio))
+  const target = clamped * progressTotal
+  let index = 0
+  while (index < progressDists.length - 1 && progressDists[index] < target) index += 1
+
+  const head = [progressPoints[index].lng, progressPoints[index].lat]
+  const remain = progressPoints.slice(index).map((point) => [point.lng, point.lat])
+
+  if (!progressMarker) {
+    progressMarker = new AMapRef.CircleMarker({
+      center: head,
+      radius: 8,
+      strokeColor: '#ffffff',
+      strokeWeight: 3,
+      fillColor: '#2f6bff',
+      fillOpacity: 1,
+      zIndex: 130
+    })
+    map.add(progressMarker)
+  } else {
+    progressMarker.setCenter(head)
+  }
+
+  if (clamped >= 1) {
+    if (maskLine) {
+      map.remove(maskLine)
+      maskLine = null
+    }
+  } else if (remain.length > 1) {
+    if (!maskLine) {
+      maskLine = new AMapRef.Polyline({
+        path: remain,
+        strokeColor: '#cbd5e1',
+        strokeWeight: 6,
+        strokeOpacity: 0.92,
+        lineJoin: 'round',
+        lineCap: 'round',
+        zIndex: 70
+      })
+      map.add(maskLine)
+    } else {
+      maskLine.setPath(remain)
+    }
+  }
+
+  map.setCenter(head)
+}
+
+function resetProgress() {
+  if (maskLine && map) {
+    map.remove(maskLine)
+    maskLine = null
+  }
+  if (progressMarker && map) {
+    map.remove(progressMarker)
+    progressMarker = null
+  }
+}
+
+function focusTrack() {
+  if (!map) return
+  const targets = segmentLines.length ? segmentLines : polyline ? [polyline] : []
+  if (targets.length) map.setFitView(targets, false, [60, 60, 60, 60])
 }
 
 async function init() {
@@ -238,6 +362,13 @@ function recenter() {
 
 watch(() => props.points, () => draw(false))
 watch(() => props.mode, () => draw(true))
+watch(
+  () => props.segments,
+  () => {
+    progressPoints = []
+    if (state.value === 'ready') draw(false)
+  }
+)
 watch(() => props.follow, (follow) => {
   if (follow) recenter()
 })
@@ -257,7 +388,7 @@ onBeforeUnmount(() => {
   }
 })
 
-defineExpose({ recenter })
+defineExpose({ recenter, setProgress, resetProgress, focusTrack })
 </script>
 
 <template>
@@ -361,5 +492,21 @@ defineExpose({ recenter })
   font-size: 11px;
   font-weight: 600;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
+}
+
+/* 高德 logo 与版权标注：统一移到左下角，层级压低，
+   启动页/记录中页的底部面板会自然盖住它，避免与提示文字重叠 */
+.route-map :deep(.amap-logo) {
+  right: auto !important;
+  left: 10px !important;
+  bottom: 6px !important;
+  z-index: 3 !important;
+}
+
+.route-map :deep(.amap-copyright) {
+  right: auto !important;
+  left: 92px !important;
+  bottom: 8px !important;
+  z-index: 3 !important;
 }
 </style>

@@ -6,6 +6,8 @@ import {
   ArrowLeft,
   Check,
   ChevronRight,
+  History,
+  Music,
   Navigation,
   Pause,
   Play,
@@ -29,6 +31,9 @@ import { useRouteHistory } from '../composables/useRouteHistory'
 import { useLocateProbe } from '../composables/useLocateProbe'
 import RouteMap from '../components/RouteMap.vue'
 import RouteThumb from '../components/RouteThumb.vue'
+import StartCountdown from '../components/StartCountdown.vue'
+import MusicSheet from '../components/MusicSheet.vue'
+import { loadMusicSource, openMusicApp } from '../utils/musicApp'
 
 const route = useRoute()
 const router = useRouter()
@@ -78,6 +83,16 @@ const mapRef = ref(null)
 const refreshing = ref(false)
 const refreshNote = ref('')
 let refreshNoteTimer = null
+
+/* Keep 式启动页：音源、弹层与开始倒计时 */
+const musicSource = ref(loadMusicSource())
+const musicOpen = ref(false)
+const recentOpen = ref(false)
+const countdownActive = ref(false)
+const musicLabel = computed(() => ({
+  netease: '网易云音乐',
+  qq: 'QQ 音乐'
+}[musicSource.value] || '未选择音源'))
 
 const isLive = computed(() => ['tracking', 'paused'].includes(status.value))
 const isFinished = computed(() => status.value === 'finished')
@@ -190,9 +205,29 @@ async function startRun() {
     }
     discardDraft()
   }
+  /* 倒计时这几秒正好用来预热 GPS，减少开头的漂移点 */
+  countdownActive.value = true
+  refreshLocation()
+}
+
+function handleCountdownDone() {
+  countdownActive.value = false
   if (!start(selectedSport.value)) {
     toast('当前已有记录在进行')
   }
+}
+
+function onMusicTap() {
+  if (!musicSource.value) {
+    musicOpen.value = true
+    return
+  }
+  openMusicApp(musicSource.value)
+}
+
+function onMusicPicked(value) {
+  musicSource.value = value
+  if (value) openMusicApp(value)
 }
 
 async function askFinish() {
@@ -359,6 +394,15 @@ onBeforeRouteLeave(async (to, from, next) => {
         </div>
 
         <div class="track-live__bottom">
+          <button type="button" class="live-music" @click="onMusicTap">
+            <span class="live-music__icon"><Music :size="16" /></span>
+            <span class="live-music__text">
+              <strong>{{ musicLabel }}</strong>
+              <small>{{ musicSource ? '点按唤起音乐 App' : '选择音源，运动时来点音乐' }}</small>
+            </span>
+            <ChevronRight :size="14" />
+          </button>
+
           <div class="track-distance">
             <strong>{{ distanceView.value }}</strong>
             <span>{{ distanceView.unit }}</span>
@@ -379,7 +423,7 @@ onBeforeRouteLeave(async (to, from, next) => {
           </div>
 
           <p v-if="trackerError" class="track-error">{{ trackerError }}</p>
-          <p v-if="pointLimitReached" class="track-tip">轨迹点已达上限，后续点位不再记录。</p>
+          <p v-if="pointLimitReached" class="track-tip track-tip--dark">轨迹点已达上限，后续点位不再记录。</p>
 
           <div class="track-actions">
             <button
@@ -396,6 +440,8 @@ onBeforeRouteLeave(async (to, from, next) => {
             </button>
           </div>
         </div>
+
+        <MusicSheet v-model="musicOpen" :source="musicSource" @picked="onMusicPicked" />
       </div>
     </template>
 
@@ -463,136 +509,163 @@ onBeforeRouteLeave(async (to, from, next) => {
     </template>
 
     <template v-else>
-      <header class="topbar">
-        <button type="button" class="topbar__btn" aria-label="返回" @click="router.back()">
-          <ArrowLeft :size="20" />
-        </button>
-        <h1>运动轨迹</h1>
-      </header>
-
-      <section class="track-hero">
+      <div class="track-launcher">
         <RouteMap
           ref="mapRef"
           :points="[]"
           mode="detail"
           :follow="false"
           :center="previewCenter"
-          class="track-hero__map"
+          class="track-launcher__map"
           @missing-key="mapMissing = true"
           @ready="mapMissing = false"
         />
-        <span class="track-hero__badge">
-          <Navigation :size="13" />
-          {{ locateLabel }}
-        </span>
-        <button
-          v-if="!mapMissing"
-          type="button"
-          class="track-refresh track-refresh--idle"
-          :disabled="refreshing"
-          @click="refreshLocation"
-        >
-          <Navigation :size="13" />
-          {{ refreshing ? '正在刷新' : '刷新定位' }}
-        </button>
-      </section>
 
-      <div v-if="mapMissing" class="track-notice">
-        <AlertTriangle :size="16" />
-        <span>
-          地图未配置：在 <code>.env</code> 填写 <code>VITE_AMAP_JS_KEY</code> 和
-          <code>VITE_AMAP_SECURITY_CODE</code> 后重启。
-        </span>
-      </div>
-
-      <div v-if="locateState === 'failed'" class="track-notice">
-        <AlertTriangle :size="16" />
-        <span>
-          未能获取当前位置：请允许浏览器定位权限；手机用局域网 HTTP 地址访问时，浏览器会禁用定位，需要 HTTPS。
-        </span>
-      </div>
-
-      <div class="section-title">
-        <h2>选择运动</h2>
-        <span>结束后自动打卡</span>
-      </div>
-
-      <div class="track-sports">
-        <button
-          v-for="item in sportOptions"
-          :key="item.name"
-          type="button"
-          class="track-sport"
-          :class="{ active: selectedSport === item.name }"
-          :aria-pressed="selectedSport === item.name"
-          @click="selectedSport = item.name"
-        >
-          <span class="track-sport__icon">
-            <component :is="item.icon" :size="18" />
+        <div class="track-launcher__top">
+          <button type="button" class="track-round" aria-label="返回" @click="router.back()">
+            <ArrowLeft :size="19" />
+          </button>
+          <span class="track-launcher__badge">
+            <Navigation :size="13" />
+            {{ locateLabel }}
           </span>
-          <strong>{{ item.name }}</strong>
-          <small>MET {{ item.met.toFixed(1) }}</small>
-          <span v-if="selectedSport === item.name" class="track-sport__check">
-            <Check :size="11" />
-          </span>
-        </button>
-      </div>
-
-      <button type="button" class="btn-primary track-start" @click="startRun">
-        <Navigation :size="18" />
-        开始记录
-      </button>
-      <p class="track-tip">
-        页面保持在前台时记录轨迹；锁屏或切后台可能暂停定位。
-      </p>
-
-      <section v-if="draft" class="draft-card">
-        <div>
-          <strong>上次记录未完成</strong>
-          <span>{{ draftText }}</span>
-        </div>
-        <div class="draft-actions">
-          <button type="button" @click="discardDraftRun">丢弃</button>
-          <button type="button" class="draft-primary" @click="resumeDraftRun">继续</button>
-        </div>
-      </section>
-
-      <div class="section-title">
-        <h2>最近轨迹</h2>
-        <span>{{ recent.length }} 条</span>
-      </div>
-
-      <div v-if="loadingRoutes" class="card loading-card">
-        <div class="loading-line"><span></span></div>
-      </div>
-      <div v-else-if="recent.length" class="route-list">
-        <button
-          v-for="item in recent"
-          :key="item.id"
-          type="button"
-          class="route-item"
-          @click="openRoute(item.id)"
-        >
-          <span
-            class="route-item__icon"
-            :class="{ 'route-item__icon--map': item.preview && item.preview.length >= 2 }"
+          <button
+            v-if="!mapMissing"
+            type="button"
+            class="track-launcher__refresh"
+            :disabled="refreshing"
+            @click="refreshLocation"
           >
-            <RouteThumb v-if="item.preview && item.preview.length >= 2" :points="item.preview" />
-            <component v-else :is="sportMeta(item.type)?.icon || RouteIcon" :size="18" />
+            <Navigation :size="13" />
+            {{ refreshing ? '正在刷新' : '刷新定位' }}
+          </button>
+        </div>
+
+        <div class="track-launcher__stack">
+        <div v-if="mapMissing" class="track-launcher__notice">
+          <AlertTriangle :size="15" />
+          <span>
+            地图未配置：在 <code>.env</code> 填写 <code>VITE_AMAP_JS_KEY</code> 和
+            <code>VITE_AMAP_SECURITY_CODE</code> 后重启。
           </span>
-          <span class="route-item__main">
-            <strong>{{ item.type }} · {{ formatDistance(item.distanceM) }}</strong>
-            <small>{{ formatWhen(item.startedAt) }} · {{ formatDuration(item.durationSec) }} · {{ routePace(item) }}</small>
+        </div>
+
+        <div v-if="locateState === 'failed'" class="track-launcher__notice">
+          <AlertTriangle :size="15" />
+          <span>
+            未能获取当前位置：请允许浏览器定位权限；手机用局域网 HTTP 地址访问时，浏览器会禁用定位，需要 HTTPS。
           </span>
-          <span class="route-item__cal">{{ item.calories }}<small>千卡</small></span>
-          <ChevronRight :size="16" class="chev" />
-        </button>
+        </div>
+
+        <div v-if="draft" class="track-launcher__draft">
+          <div>
+            <strong>上次记录未完成</strong>
+            <span>{{ draftText }}</span>
+          </div>
+          <div class="draft-actions">
+            <button type="button" @click="discardDraftRun">丢弃</button>
+            <button type="button" class="draft-primary" @click="resumeDraftRun">继续</button>
+          </div>
+        </div>
+        </div>
+
+        <div class="track-launcher__drawer">
+          <div class="launcher-head">
+            <strong>{{ selectedSport }}</strong>
+            <span>自由记录</span>
+          </div>
+
+          <div class="launcher-sports">
+            <button
+              v-for="item in sportOptions"
+              :key="item.name"
+              type="button"
+              class="launcher-sport"
+              :class="{ active: selectedSport === item.name }"
+              :aria-pressed="selectedSport === item.name"
+              @click="selectedSport = item.name"
+            >
+              {{ item.name }}
+            </button>
+          </div>
+
+          <div class="launcher-go">
+            <button type="button" class="launcher-side" aria-label="音乐" @click="onMusicTap">
+              <Music :size="18" />
+              <span>{{ musicSource ? '音乐' : '选音源' }}</span>
+            </button>
+            <button type="button" class="launcher-go__main" aria-label="开始记录" @click="startRun">
+              GO
+            </button>
+            <button
+              type="button"
+              class="launcher-side"
+              aria-label="最近轨迹"
+              @click="recentOpen = true"
+            >
+              <History :size="18" />
+              <span>轨迹</span>
+            </button>
+          </div>
+
+          <p class="launcher-tip">页面保持在前台时记录轨迹；锁屏或切后台可能暂停定位。</p>
+        </div>
+
+        <StartCountdown
+          v-if="countdownActive"
+          :sport="selectedSport"
+          @done="handleCountdownDone"
+        />
       </div>
-      <div v-else class="card empty-routes">
-        <RouteIcon :size="24" />
-        <strong>还没有轨迹</strong>
-        <span>开始一次跑步、快走或骑行吧</span>
-      </div>
+
+      <transition name="ui">
+        <div v-if="recentOpen" class="sheet-overlay" @click.self="recentOpen = false">
+          <div class="sheet-panel" role="dialog" aria-modal="true" aria-label="最近轨迹">
+            <div class="sheet-panel__head">
+              <strong>最近轨迹</strong>
+              <span>{{ recent.length }} 条</span>
+              <button type="button" class="sheet-panel__close" @click="recentOpen = false">
+                关闭
+              </button>
+            </div>
+            <div class="sheet-panel__body">
+              <div v-if="loadingRoutes" class="card loading-card">
+                <div class="loading-line"><span></span></div>
+              </div>
+              <div v-else-if="recent.length" class="route-list">
+                <button
+                  v-for="item in recent"
+                  :key="item.id"
+                  type="button"
+                  class="route-item"
+                  @click="openRoute(item.id)"
+                >
+                  <span
+                    class="route-item__icon"
+                    :class="{ 'route-item__icon--map': item.preview && item.preview.length >= 2 }"
+                  >
+                    <RouteThumb v-if="item.preview && item.preview.length >= 2" :points="item.preview" />
+                    <component v-else :is="sportMeta(item.type)?.icon || RouteIcon" :size="18" />
+                  </span>
+                  <span class="route-item__main">
+                    <strong>{{ item.type }} · {{ formatDistance(item.distanceM) }}</strong>
+                    <small>{{ formatWhen(item.startedAt) }} · {{ formatDuration(item.durationSec) }} · {{ routePace(item) }}</small>
+                  </span>
+                  <span class="route-item__cal">{{ item.calories }}<small>千卡</small></span>
+                  <ChevronRight :size="16" class="chev" />
+                </button>
+              </div>
+              <div v-else class="card empty-routes">
+                <RouteIcon :size="24" />
+                <strong>还没有轨迹</strong>
+                <span>开始一次跑步、快走或骑行吧</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </transition>
+
+      <MusicSheet v-model="musicOpen" :source="musicSource" @picked="onMusicPicked" />
     </template>
   </div>
 </template>
@@ -732,10 +805,60 @@ onBeforeRouteLeave(async (to, from, next) => {
   right: 0;
   bottom: 0;
   z-index: 4;
-  padding: 18px 20px calc(18px + env(safe-area-inset-bottom));
+  padding: 14px 20px calc(18px + env(safe-area-inset-bottom));
   border-radius: 26px 26px 0 0;
-  background: #fff;
-  box-shadow: 0 -12px 40px rgba(2, 8, 23, 0.16);
+  background: #0f172a;
+  box-shadow: 0 -12px 40px rgba(2, 8, 23, 0.5);
+}
+
+.live-music {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 12px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 10px 12px;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.live-music__icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #9db8ff;
+}
+
+.live-music__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.live-music__text strong {
+  display: block;
+  font-size: 13px;
+  line-height: 17px;
+}
+
+.live-music__text small {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  line-height: 15px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.live-music > svg {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .track-distance {
@@ -745,15 +868,16 @@ onBeforeRouteLeave(async (to, from, next) => {
 }
 
 .track-distance strong {
-  color: #0f172a;
-  font-size: 48px;
+  color: #fff;
+  font-size: 56px;
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
 }
 
 .track-distance span {
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.55);
   font-size: 16px;
   font-weight: 600;
 }
@@ -772,19 +896,20 @@ onBeforeRouteLeave(async (to, from, next) => {
 }
 
 .track-metrics span {
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.5);
   font-size: 11px;
 }
 
 .track-metrics strong {
-  color: #0f172a;
+  color: #fff;
   font-size: 18px;
   line-height: 22px;
+  font-variant-numeric: tabular-nums;
 }
 
 .track-metrics small {
   margin-left: 2px;
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.5);
   font-size: 10px;
   font-weight: 500;
 }
@@ -809,9 +934,9 @@ onBeforeRouteLeave(async (to, from, next) => {
 }
 
 .track-pause {
-  border: 1px solid #dbe3f0;
-  background: #f8fafc;
-  color: #334155;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
 }
 
 .track-finish {
@@ -824,133 +949,321 @@ onBeforeRouteLeave(async (to, from, next) => {
 .track-error {
   margin: 10px 0 0;
   border-radius: 10px;
-  background: #fef2f2;
+  background: rgba(239, 68, 68, 0.14);
   padding: 8px 10px;
-  color: #b91c1c;
+  color: #fca5a5;
   font-size: 11px;
   line-height: 16px;
 }
 
-.track-hero {
-  position: relative;
-  height: 220px;
-  margin-top: 8px;
-  border-radius: 24px;
+.track-tip--dark {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.track-launcher {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  z-index: 110;
+  width: 100%;
+  max-width: 480px;
+  transform: translateX(-50%);
+  background: #0f172a;
   overflow: hidden;
-  background: #dbeafe;
-  box-shadow: 0 14px 30px rgba(47, 107, 255, 0.12);
 }
 
-.track-hero__map {
-  height: 100%;
-}
-
-.track-hero__badge {
+.track-launcher__map {
   position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 3;
+  inset: 0;
+}
+
+.track-launcher__top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(14px + env(safe-area-inset-top)) 16px 12px;
+}
+
+.track-launcher__badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  height: 30px;
+  padding: 0 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.92);
   color: var(--blue);
   font-size: 11px;
   font-weight: 600;
-  backdrop-filter: blur(8px);
 }
 
-.track-notice {
+.track-launcher__refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.track-launcher__refresh:disabled {
+  opacity: 0.7;
+}
+
+.track-launcher__stack {
+  position: absolute;
+  top: calc(58px + env(safe-area-inset-top));
+  left: 16px;
+  right: 16px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.track-launcher__notice {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin-top: 12px;
   border: 1px solid #fed7aa;
   border-radius: 14px;
-  background: #fff7ed;
+  background: rgba(255, 247, 237, 0.95);
   padding: 10px 12px;
   color: #9a3412;
   font-size: 11px;
   line-height: 17px;
 }
 
-.track-notice code {
+.track-launcher__notice code {
   border-radius: 4px;
   background: rgba(154, 52, 18, 0.08);
   padding: 1px 3px;
   font-size: 10px;
 }
 
-.track-sports {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+.track-launcher__draft {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(47, 107, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 11px 13px;
 }
 
-.track-sport {
-  position: relative;
+.track-launcher__draft > div:first-child {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
-  padding: 14px 12px;
-  text-align: left;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  gap: 2px;
+  min-width: 0;
 }
 
-.track-sport:active {
-  transform: scale(0.98);
+.track-launcher__draft strong {
+  color: var(--text);
+  font-size: 13px;
 }
 
-.track-sport.active {
+.track-launcher__draft span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+
+
+
+.track-launcher__drawer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  border-radius: 26px 26px 0 0;
+  background: #fff;
+  padding: 16px 20px calc(14px + env(safe-area-inset-bottom));
+  box-shadow: 0 -12px 40px rgba(2, 8, 23, 0.18);
+}
+
+.launcher-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.launcher-head strong {
+  color: #0f172a;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.launcher-head span {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.launcher-sports {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.launcher-sport {
+  flex: 1;
+  height: 40px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.launcher-sport.active {
   border-color: rgba(47, 107, 255, 0.5);
-  background: linear-gradient(160deg, #eef4ff, #fff);
-  box-shadow: 0 8px 20px rgba(47, 107, 255, 0.12);
-}
-
-.track-sport__icon {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  margin-bottom: 2px;
-  border-radius: 12px;
-  background: rgba(47, 107, 255, 0.08);
+  background: var(--blue-soft);
   color: var(--blue);
 }
 
-.track-sport strong {
-  color: var(--text);
-  font-size: 14px;
+.launcher-go {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
 }
 
-.track-sport small {
-  color: var(--muted);
+.launcher-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: 56px;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
   font-size: 10px;
+  cursor: pointer;
 }
 
-.track-sport__check {
-  position: absolute;
-  top: 10px;
-  right: 10px;
+.launcher-side svg {
   display: grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  background: var(--blue);
-  color: #fff;
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 12px;
 }
 
-.track-start {
-  width: 100%;
-  margin-top: 16px;
+.launcher-go__main {
+  width: 78px;
+  height: 78px;
+  border: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2f6bff, #5b8cff);
+  color: #fff;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  box-shadow: 0 14px 30px rgba(47, 107, 255, 0.35);
+  cursor: pointer;
 }
+
+.launcher-go__main:active {
+  transform: scale(0.95);
+}
+
+.launcher-tip {
+  margin: 12px 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 230;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.sheet-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 480px;
+  max-height: 72vh;
+  border-radius: 24px 24px 0 0;
+  background: var(--surface);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.sheet-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px 10px;
+}
+
+.sheet-panel__head strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.sheet-panel__head span {
+  flex: 1;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.sheet-panel__close {
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sheet-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 20px 20px;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 .track-tip {
   margin: 10px 4px 0;
@@ -964,34 +1277,9 @@ onBeforeRouteLeave(async (to, from, next) => {
   color: #b45309;
 }
 
-.draft-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 14px;
-  border: 1px solid rgba(47, 107, 255, 0.18);
-  border-radius: 18px;
-  background: linear-gradient(135deg, #eef4ff, #fff);
-  padding: 13px 14px;
-}
 
-.draft-card > div:first-child {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
 
-.draft-card strong {
-  color: var(--text);
-  font-size: 13px;
-}
 
-.draft-card span {
-  color: var(--muted);
-  font-size: 11px;
-}
 
 .draft-actions {
   display: flex;
