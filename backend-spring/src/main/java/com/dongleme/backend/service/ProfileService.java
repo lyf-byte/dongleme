@@ -220,7 +220,8 @@ public class ProfileService {
     }
 
     @Transactional
-    public Map<String, Object> clear(String userId) {        authService.requireUser(userId);
+    public Map<String, Object> clear(String userId) {
+        authService.requireUser(userId);
 
         routeMapper.delete(
                 Wrappers.<ActivityRoute>lambdaQuery().eq(ActivityRoute::getUserId, userId));
