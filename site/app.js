@@ -77,7 +77,12 @@
       apk.setAttribute('aria-label', 'Android 版准备中，前往网页版体验')
     }
 
-    fetch(apk.getAttribute('href'), { method: 'HEAD', cache: 'no-store' })
+    var href = apk.getAttribute('href') || ''
+
+    // 外链下载源（如 Gitee Release）不做 HEAD 探测：跨域请求会被 CORS 拦截，误判成不可用
+    if (/^https?:/i.test(href)) return
+
+    fetch(href, { method: 'HEAD', cache: 'no-store' })
       .then(function (res) {
         if (!res.ok) showPending()
       })
