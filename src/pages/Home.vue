@@ -11,18 +11,24 @@ import {
   Plus,
   RefreshCw,
   Settings2,
+  Target,
   Timer
 } from 'lucide-vue-next'
 import { getProfile, getCustomSports } from '../utils/api'
 import { mergeSports } from '../utils/sport'
 import { avatarFor } from '../utils/avatar'
 import { useWeather } from '../composables/useWeather'
+import { useCountUp } from '../composables/useCountUp'
+import { consumeNewBadges, evaluateBadges, statsFromProfile } from '../utils/badges'
 import WeatherInline from '../components/WeatherInline.vue'
 import WeatherScene from '../components/WeatherScene.vue'
 import WeatherCanvas from '../components/WeatherCanvas.vue'
 import CustomSportManager from '../components/CustomSportManager.vue'
 import HomeSportGrid from '../components/HomeSportGrid.vue'
 import HomeRecentRecords from '../components/HomeRecentRecords.vue'
+import GoalRing from '../components/GoalRing.vue'
+import GoalSheet from '../components/GoalSheet.vue'
+import BadgeUnlock from '../components/BadgeUnlock.vue'
 
 const router = useRouter()
 const loading = ref(true)
@@ -98,6 +104,10 @@ const weeklyGoal = computed(() => profile.value?.weeklyGoal || 150)
 const progress = computed(() =>
   Math.min(100, Math.round((weekMinutes.value / weeklyGoal.value) * 100))
 )
+const streakView = useCountUp(computed(() => profile.value?.streak || 0))
+const goalOpen = ref(false)
+const unlocked = ref([])
+
 const recentRecords = computed(() => (profile.value?.recent || []).slice(0, 3))
 const recentRows = computed(() => recentRecords.value.map((item) => ({
   key: `${item.date}-${item.type}-${item.duration}`,
@@ -139,9 +149,17 @@ async function load() {
     ])
     profile.value = profileResult.status === 'fulfilled' ? profileResult.value : null
     customSports.value = sportsResult.status === 'fulfilled' ? sportsResult.value : []
+    if (profile.value) {
+      const fresh = consumeNewBadges(evaluateBadges(statsFromProfile(profile.value)))
+      if (fresh.length) unlocked.value = fresh
+    }
   } finally {
     loading.value = false
   }
+}
+
+function handleGoalSaved(next) {
+  if (profile.value) profile.value.weeklyGoal = next
 }
 
 function handleSportsChanged(list) {
@@ -235,7 +253,7 @@ onUnmounted(() => {
         </div>
 
         <div class="streak-main">
-          <strong>{{ profile.streak }}</strong>
+          <strong class="streak-num">{{ streakView }}</strong>
           <span>天</span>
           <button type="button" class="streak-btn" @click="goCheckin()">
             去打卡
@@ -268,14 +286,19 @@ onUnmounted(() => {
 
       <div class="today-grid">
         <div class="card today-card">
-          <span class="today-icon today-icon--blue"><Clock3 :size="18" /></span>
+          <span class="today-icon today-icon--blue"><Clock3 :size="17" /></span>
           <p>今日运动</p>
           <strong>{{ today.minutes }}<span>分钟</span></strong>
         </div>
         <div class="card today-card">
-          <span class="today-icon today-icon--orange"><Flame :size="18" /></span>
+          <span class="today-icon today-icon--orange"><Flame :size="17" /></span>
           <p>今日消耗</p>
           <strong>{{ today.calories }}<span>千卡</span></strong>
+        </div>
+        <div class="card today-card">
+          <span class="today-icon today-icon--violet"><Target :size="17" /></span>
+          <p>本周时长</p>
+          <strong>{{ weekMinutes }}<span>分钟</span></strong>
         </div>
       </div>
 
@@ -294,12 +317,24 @@ onUnmounted(() => {
       </button>
 
       <section class="card week-card">
-        <div class="week-head">
-          <h2>本周进度</h2>
-          <span>{{ weekMinutes }} / {{ weeklyGoal }} 分钟</span>
+        <GoalRing :value="weekMinutes" :goal="weeklyGoal" :size="94" :thickness="9">
+          <template #default="{ percent }">
+            <strong>{{ percent }}<em>%</em></strong>
+          </template>
+        </GoalRing>
+        <div class="week-body">
+          <div class="week-head">
+            <h2>本周进度</h2>
+            <button type="button" class="goal-edit" @click="goalOpen = true">
+              调整目标
+            </button>
+          </div>
+          <p class="week-value">
+            <strong>{{ weekMinutes }}</strong>
+            <span>/ {{ weeklyGoal }} 分钟</span>
+          </p>
+          <p class="week-tip">{{ weekTip }}</p>
         </div>
-        <div class="bar"><i :style="{ width: progress + '%' }"></i></div>
-        <p>{{ weekTip }}</p>
       </section>
 
       <template v-if="recentRecords.length">
@@ -344,6 +379,15 @@ onUnmounted(() => {
       </div>
 
       <CustomSportManager v-model="managerOpen" @changed="handleSportsChanged" />
+
+      <GoalSheet
+        v-model="goalOpen"
+        :goal="weeklyGoal"
+        :profile="profile"
+        @saved="handleGoalSaved"
+      />
+
+      <BadgeUnlock :badges="unlocked" @close="unlocked = []" />
     </template>
 
     <div v-else class="card empty-state">
@@ -536,6 +580,16 @@ onUnmounted(() => {
   color: rgba(255, 255, 255, 0.82);
 }
 
+.streak-num {
+  display: inline-block;
+  animation: streakPop 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.streak-label svg {
+  animation: flamePulse 2.6s ease-in-out infinite;
+  transform-origin: center;
+}
+
 .streak-btn {
   margin-left: auto;
   display: inline-flex;
@@ -595,14 +649,14 @@ onUnmounted(() => {
 
 .today-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
   margin-top: 14px;
 }
 
 .today-card {
-  padding: 14px;
-  border-radius: 18px;
+  padding: 12px 10px 13px;
+  border-radius: 16px;
 }
 
 .today-icon {
@@ -623,9 +677,14 @@ onUnmounted(() => {
   color: var(--orange);
 }
 
+.today-icon--violet {
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+
 .today-card p {
-  margin: 10px 0 0;
-  font-size: 12px;
+  margin: 9px 0 0;
+  font-size: 11px;
   color: var(--muted);
 }
 
@@ -701,8 +760,8 @@ onUnmounted(() => {
 .today-card strong {
   display: block;
   margin-top: 2px;
-  font-size: 24px;
-  line-height: 30px;
+  font-size: 19px;
+  line-height: 25px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -715,49 +774,70 @@ onUnmounted(() => {
 }
 
 .week-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   margin-top: 14px;
   padding: 16px;
-  border-radius: 18px;
+  border-radius: 20px;
+}
+
+.week-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .week-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .week-head h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
 }
 
-.week-head span {
-  font-size: 12px;
+.goal-edit {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--blue);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.week-value {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin: 7px 0 0;
+}
+
+.week-value strong {
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 24px;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.week-value span {
+  font-size: 11px;
   color: var(--muted);
 }
 
-.bar {
-  height: 8px;
-  margin-top: 12px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--blue-soft);
-}
-
-.bar i {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: var(--blue);
-  transition: width 0.3s ease;
-}
-
-.week-card p {
-  margin: 8px 0 0;
-  font-size: 12px;
-  line-height: 18px;
+.week-tip {
+  margin: 5px 0 0;
+  font-size: 11px;
+  line-height: 16px;
   color: var(--muted);
 }
 
@@ -824,6 +904,29 @@ onUnmounted(() => {
   }
 }
 
+@keyframes streakPop {
+  from {
+    opacity: 0;
+    transform: translateY(7px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes flamePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.88;
+  }
+  50% {
+    transform: scale(1.14);
+    opacity: 1;
+  }
+}
+
 @keyframes cardAurora {
   from {
     transform: translate3d(-2%, -1%, 0) scale(1);
@@ -834,7 +937,9 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .streak-card::before {
+  .streak-card::before,
+  .streak-num,
+  .streak-label svg {
     animation: none;
   }
 }

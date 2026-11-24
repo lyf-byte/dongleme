@@ -1,19 +1,11 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  Award,
-  ChevronRight,
-  Clock3,
-  Flame,
-  Route as RouteIcon,
-  Settings,
-  Sparkles,
-  Trophy
-} from 'lucide-vue-next'
+import { ChevronRight, Flame, Route as RouteIcon, Settings } from 'lucide-vue-next'
 import { getProfile, updateProfile, errorMessage } from '../utils/api'
 import { getUser } from '../utils/auth'
 import { avatarFor } from '../utils/avatar'
+import { evaluateBadges, statsFromProfile } from '../utils/badges'
 import { toast } from '../utils/ui'
 
 const router = useRouter()
@@ -40,38 +32,8 @@ const totals = computed(() => [
   { label: '总消耗', value: profile.value?.total?.calories || 0, unit: '千卡' }
 ])
 
-const achievements = computed(() => {
-  const streak = profile.value?.streak || 0
-  const count = profile.value?.total?.count || 0
-  const minutes = profile.value?.total?.minutes || 0
-  return [
-    {
-      label: '初次打卡', desc: '完成第 1 次运动', earned: count >= 1,
-      current: Math.min(count, 1), target: 1, unit: '次', icon: Sparkles
-    },
-    {
-      label: '连续 3 天', desc: '坚持三天', earned: streak >= 3,
-      current: Math.min(streak, 3), target: 3, unit: '天', icon: Flame
-    },
-    {
-      label: '连续 7 天', desc: '坚持一周', earned: streak >= 7,
-      current: Math.min(streak, 7), target: 7, unit: '天', icon: Flame
-    },
-    {
-      label: '连续 30 天', desc: '坚持一个月', earned: streak >= 30,
-      current: Math.min(streak, 30), target: 30, unit: '天', icon: Trophy
-    },
-    {
-      label: '打卡 10 次', desc: '累计十次运动', earned: count >= 10,
-      current: Math.min(count, 10), target: 10, unit: '次', icon: Award
-    },
-    {
-      label: '运动 1000 分钟', desc: '累计时长', earned: minutes >= 1000,
-      current: Math.min(minutes, 1000), target: 1000, unit: '分钟', icon: Clock3
-    }
-  ]
-})
-const earnedCount = computed(() => achievements.value.filter((item) => item.earned).length)
+const badges = computed(() => evaluateBadges(statsFromProfile(profile.value)))
+const earnedCount = computed(() => badges.value.filter((item) => item.earned).length)
 const activeBadge = ref(null)
 
 async function load() {
@@ -197,40 +159,69 @@ onMounted(load)
 
       <div class="section-title">
         <h2>成就徽章</h2>
-        <span>{{ earnedCount }} / {{ achievements.length }}</span>
+        <span>已解锁 {{ earnedCount }} / {{ badges.length }}</span>
       </div>
 
       <div class="badge-grid">
         <button
-          v-for="badge in achievements"
-          :key="badge.label"
+          v-for="badge in badges"
+          :key="badge.id"
           type="button"
           class="badge-card"
           :class="{ earned: badge.earned }"
           @click="activeBadge = badge"
         >
-          <span class="badge-icon"><component :is="badge.icon" :size="18" /></span>
-          <strong>{{ badge.label }}</strong>
+          <span
+            class="badge-icon"
+            :style="badge.earned ? { background: badge.tierStyle.soft, color: badge.tierStyle.color } : null"
+          >
+            <component :is="badge.icon" :size="17" />
+          </span>
+          <strong>{{ badge.name }}</strong>
           <small>
-            {{ badge.earned ? badge.desc : `${badge.current} / ${badge.target} ${badge.unit}` }}
+            {{ badge.earned ? badge.tierStyle.label + '章' : badge.current + ' / ' + badge.target }}
           </small>
+          <span class="badge-meter">
+            <i
+              :style="{
+                width: badge.percent + '%',
+                background: badge.earned ? badge.tierStyle.color : 'var(--blue)'
+              }"
+            ></i>
+          </span>
         </button>
       </div>
 
       <transition name="ui">
         <div v-if="activeBadge" class="badge-overlay" @click.self="activeBadge = null">
-          <div class="badge-sheet" role="dialog" aria-modal="true" :aria-label="activeBadge.label">
-            <span class="badge-sheet__icon" :class="{ earned: activeBadge.earned }">
+          <div class="badge-sheet" role="dialog" aria-modal="true" :aria-label="activeBadge.name">
+            <span
+              class="badge-sheet__icon"
+              :class="{ earned: activeBadge.earned }"
+              :style="activeBadge.earned
+                ? { background: activeBadge.tierStyle.soft, color: activeBadge.tierStyle.color }
+                : null"
+            >
               <component :is="activeBadge.icon" :size="26" />
             </span>
-            <strong>{{ activeBadge.label }}</strong>
+            <small class="badge-sheet__tier">
+              {{ activeBadge.tierStyle ? activeBadge.tierStyle.label + '章' : '未解锁' }} ·
+              {{ activeBadge.earned ? '已解锁' : '继续加油' }}
+            </small>
+            <strong>{{ activeBadge.name }}</strong>
             <p>{{ activeBadge.desc }}</p>
             <div class="badge-sheet__bar">
-              <i :style="{ width: Math.round((activeBadge.current / activeBadge.target) * 100) + '%' }"></i>
+              <i
+                :style="{
+                  width: activeBadge.percent + '%',
+                  background: activeBadge.earned && activeBadge.tierStyle
+                    ? activeBadge.tierStyle.color
+                    : 'var(--blue)'
+                }"
+              ></i>
             </div>
             <span class="badge-sheet__progress">
               {{ activeBadge.current }} / {{ activeBadge.target }} {{ activeBadge.unit }}
-              {{ activeBadge.earned ? '· 已获得' : '' }}
             </span>
             <button type="button" class="btn-primary btn-sm" @click="activeBadge = null">
               知道了
@@ -438,14 +429,32 @@ onMounted(load)
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 12px 6px 10px;
+  padding: 12px 6px 11px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--surface);
   text-align: center;
   font-family: inherit;
   cursor: pointer;
-  opacity: 0.55;
+  opacity: 0.62;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.badge-meter {
+  display: block;
+  width: 80%;
+  height: 3px;
+  margin-top: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.badge-meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.4s ease;
 }
 
 .badge-card:active {
@@ -454,8 +463,9 @@ onMounted(load)
 
 .badge-card.earned {
   border-color: var(--blue-soft-2);
-  background: var(--blue-soft);
+  background: #fff;
   opacity: 1;
+  box-shadow: 0 6px 16px rgba(17, 24, 39, 0.05);
 }
 
 .badge-icon {
@@ -469,8 +479,7 @@ onMounted(load)
 }
 
 .badge-card.earned .badge-icon {
-  background: #fff;
-  color: var(--blue);
+  box-shadow: inset 0 0 0 1px rgba(17, 24, 39, 0.05);
 }
 
 .badge-card strong {
@@ -523,6 +532,12 @@ onMounted(load)
 .badge-sheet__icon.earned {
   background: var(--blue-soft);
   color: var(--blue);
+}
+
+.badge-sheet__tier {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.04em;
 }
 
 .badge-sheet strong {
