@@ -34,3 +34,11 @@ npm-debug.log*
 
 # 官网的 APK 产物，单独上传不提交
 /site/download/*.apk
+
+# 本地独立前端项目（依赖较重，暂不入库）
+/frontend/
+
+# 产品展示材料与本地工具产物
+/材料/
+/.cloudstudio
+/docs/
