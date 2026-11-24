@@ -65,7 +65,7 @@ class CheckinServiceTest {
 
     private CheckinService.CheckinOutcome checkinAt(
             String type, int duration, Double weight, boolean overwrite, LocalDate date) {
-        return service.checkinAt(USER_ID, type, duration, weight, overwrite, date);
+        return service.checkinAt(USER_ID, type, duration, weight, overwrite, date, "manual", false);
     }
 
     @Nested

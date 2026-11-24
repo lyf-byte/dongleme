@@ -15,9 +15,14 @@ import java.util.List;
 public interface CheckinRecordMapper extends BaseMapper<CheckinRecord> {
 
     @Insert("""
-            insert into records (user_id, date, type, duration, calories)
-            values (#{userId}, #{date}, #{type}, #{duration}, #{calories})
-            on duplicate key update duration = values(duration), calories = values(calories)
+            insert into records (user_id, date, type, duration, calories, source, verified, flagged)
+            values (#{userId}, #{date}, #{type}, #{duration}, #{calories}, #{source}, #{verified}, #{flagged})
+            on duplicate key update
+                duration = if(verified = 1 and values(verified) = 0, duration, values(duration)),
+                calories = if(verified = 1 and values(verified) = 0, calories, values(calories)),
+                source = if(verified = 1 and values(verified) = 0, source, values(source)),
+                flagged = if(verified = 1 and values(verified) = 0, flagged, values(flagged)),
+                verified = greatest(verified, values(verified))
             """)
     int upsert(CheckinRecord record);
 

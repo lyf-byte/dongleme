@@ -3,7 +3,9 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ArrowLeft,
+  BellRing,
   ChevronRight,
+  Clock3,
   Download,
   FileText,
   Info,
@@ -16,6 +18,7 @@ import {
 } from 'lucide-vue-next'
 import { clearRecords, errorMessage, getProfile } from '../utils/api'
 import { changePassword, getUser, signOut } from '../utils/auth'
+import { getReminder, saveReminder } from '../utils/reminder'
 import { todayShanghai } from '../utils/sport'
 import { saveBlob } from '../utils/native'
 import { confirmDialog, toast } from '../utils/ui'
@@ -28,6 +31,12 @@ const pwdSaving = ref(false)
 const pwdError = ref('')
 const pwdForm = ref({ oldPassword: '', newPassword: '', confirm: '' })
 const docType = ref('')
+const reminder = ref(getReminder())
+
+function applyReminder() {
+  saveReminder(reminder.value)
+  toast(reminder.value.enabled ? `已开启运动提醒（${reminder.value.time}）` : '已关闭运动提醒')
+}
 
 const adminUrl = computed(() => `${window.location.origin}/admin`)
 
@@ -251,6 +260,38 @@ async function logout() {
     </div>
 
     <div class="section-title">
+      <h2>提醒</h2>
+    </div>
+
+    <div class="list-card">
+      <div class="list-row list-row--static list-row--control">
+        <span class="list-icon list-icon--orange"><BellRing :size="18" /></span>
+        <span class="list-text">
+          <strong>运动提醒</strong>
+          <small>打开应用时提醒今天还没打卡</small>
+        </span>
+        <label class="switch">
+          <input v-model="reminder.enabled" type="checkbox" @change="applyReminder" />
+          <span class="switch__track"></span>
+        </label>
+      </div>
+      <div v-if="reminder.enabled" class="list-row list-row--static list-row--control">
+        <span class="list-icon list-icon--orange"><Clock3 :size="18" /></span>
+        <span class="list-text">
+          <strong>提醒时间</strong>
+          <small>仅在应用内提醒，不发送系统推送</small>
+        </span>
+        <input
+          v-model="reminder.time"
+          class="reminder-time"
+          type="time"
+          aria-label="提醒时间"
+          @change="applyReminder"
+        />
+      </div>
+    </div>
+
+    <div class="section-title">
       <h2>通用</h2>
     </div>
 
@@ -383,6 +424,10 @@ async function logout() {
   cursor: default;
 }
 
+.list-row--control {
+  grid-template-columns: 36px 1fr auto;
+}
+
 .list-row--static:active {
   background: transparent;
 }
@@ -403,6 +448,66 @@ async function logout() {
 .list-icon--red {
   background: var(--red-soft);
   color: var(--red);
+}
+
+.list-icon--orange {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
+.reminder-time {
+  width: 92px;
+  padding: 5px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.switch__track {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--line-2);
+  transition: background 0.2s ease;
+}
+
+.switch__track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.24);
+  transition: transform 0.2s ease;
+}
+
+.switch input:checked + .switch__track {
+  background: var(--blue);
+}
+
+.switch input:checked + .switch__track::after {
+  transform: translateX(18px);
 }
 
 .list-text {

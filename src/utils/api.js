@@ -202,6 +202,40 @@ export async function getProfile(params) {
   return result
 }
 
+export async function getBadges() {
+  return api.get('/badges').then((res) => res.data.ids || [])
+}
+
+export async function unlockBadges(ids) {
+  return api.post('/badges', { ids }).then((res) => res.data.ids || [])
+}
+
+export async function getMakeupStatus() {
+  return api.get('/makeup').then((res) => res.data)
+}
+
+export async function useMakeupCard(date) {
+  const result = await api.post('/makeup', { date }).then((res) => res.data)
+  clearApiCache()
+  return result
+}
+
+export async function getFollowing() {
+  return api.get('/follows').then((res) => res.data)
+}
+
+export async function followUser(userId) {
+  return api.post('/follows', { userId }).then((res) => res.data)
+}
+
+export async function unfollowUser(userId) {
+  return api.delete('/follows', { params: { userId } }).then((res) => res.data)
+}
+
+export async function getFeed() {
+  return api.get('/follows/feed').then((res) => res.data)
+}
+
 export async function updateProfile(payload) {
   const result = await api.put('/profile', payload).then((res) => res.data)
   clearApiCache()
@@ -254,6 +288,14 @@ export const adminRoutes = (params = {}, force = false) =>
     force
   )
 
+export const adminFlagged = (params = {}, force = false) =>
+  adminCached(
+    `flagged:${JSON.stringify(params)}`,
+    ADMIN_TTL,
+    () => adminApi.get('/admin', { params: { action: 'flagged', ...params } }).then((res) => res.data),
+    force
+  )
+
 export const adminRank = (scope = 'week', force = false) =>
   adminCached(
     `rank:${scope}`,
@@ -278,6 +320,12 @@ export const adminDeleteUser = (id) =>
 
 export const adminDeleteRecord = (id) =>
   adminApi.delete('/admin', { params: { action: 'record', id } }).then((res) => {
+    clearAdminCache()
+    return res.data
+  })
+
+export const adminApproveRecord = (id) =>
+  adminApi.post('/admin', null, { params: { action: 'approve', id } }).then((res) => {
     clearAdminCache()
     return res.data
   })

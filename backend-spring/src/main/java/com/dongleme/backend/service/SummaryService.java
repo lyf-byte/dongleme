@@ -82,7 +82,8 @@ public class SummaryService {
                     cached != null,
                     null,
                     null,
-                    hasNewRecords(userId, cached));
+                    hasNewRecords(userId, cached),
+                    cached == null ? null : planGoalOf(cached, userId, weekStart, today));
         }
 
         if (cached != null && !force) {
@@ -92,7 +93,8 @@ public class SummaryService {
                     true,
                     null,
                     null,
-                    hasNewRecords(userId, cached));
+                    hasNewRecords(userId, cached),
+                    planGoalOf(cached, userId, weekStart, today));
         }
 
         int cachedRegenCount = cached == null || cached.getRegenCount() == null
@@ -112,37 +114,68 @@ public class SummaryService {
 
         WeekStats stats = aggregate(rows);
         if (stats.count == 0) {
-            return new SummaryView(weekStart, EMPTY_CONTENT, false, null, true, null);
+            return new SummaryView(weekStart, EMPTY_CONTENT, false, null, true, null, suggestGoal(stats));
         }
 
         String fallback = buildFallback(stats);
         if (llmUrl == null || llmUrl.isBlank() || llmKey == null || llmKey.isBlank()) {
-            saveSummary(userId, weekStart, fallback, cached, force, cachedRegenCount);
-            return new SummaryView(weekStart, fallback, false, true, null, null);
+            saveSummary(userId, weekStart, fallback, suggestGoal(stats), cached, force, cachedRegenCount);
+            return new SummaryView(weekStart, fallback, false, true, null, null, suggestGoal(stats));
         }
 
         try {
-            String content = callLlm(stats);
+            LlmResult result = callLlm(stats);
             int regenCount = cached != null && force ? cachedRegenCount + 1 : 0;
 
             WeeklySummary summary = new WeeklySummary();
             summary.setUserId(userId);
             summary.setWeekStart(weekStart);
-            summary.setContent(content);
+            summary.setContent(result.summary());
+            summary.setPlanGoal(result.planGoal());
             summary.setRegenCount(regenCount);
             summaryMapper.upsert(summary);
 
-            return new SummaryView(weekStart, content, false, null, null, null);
+            return new SummaryView(
+                    weekStart, result.summary(), false, null, null, null, result.planGoal());
         } catch (Exception exception) {
-            saveSummary(userId, weekStart, fallback, cached, force, cachedRegenCount);
-            return new SummaryView(weekStart, fallback, false, true, null, null);
+            saveSummary(userId, weekStart, fallback, suggestGoal(stats), cached, force, cachedRegenCount);
+            return new SummaryView(weekStart, fallback, false, true, null, null, suggestGoal(stats));
         }
+    }
+
+    private Integer planGoalOf(
+            WeeklySummary cached, String userId, LocalDate weekStart, LocalDate today) {
+        if (cached.getPlanGoal() != null) {
+            return cached.getPlanGoal();
+        }
+        return suggestGoal(loadStats(userId, weekStart, today));
+    }
+
+    private WeekStats loadStats(String userId, LocalDate weekStart, LocalDate today) {
+        return aggregate(recordMapper.selectList(
+                Wrappers.<CheckinRecord>lambdaQuery()
+                        .eq(CheckinRecord::getUserId, userId)
+                        .ge(CheckinRecord::getDate, weekStart)
+                        .le(CheckinRecord::getDate, today)));
+    }
+
+    /**
+     * 没有 AI 结构化结果时的目标建议：在完成量基础上增加约一成，取整到 10 分钟。
+     */
+    private static int suggestGoal(WeekStats stats) {
+        if (stats.count == 0) {
+            return 90;
+        }
+        int base = Math.max(stats.minutes + 30, (int) Math.round(stats.minutes * 1.1));
+        int rounded = (int) Math.ceil(base / 10.0) * 10;
+        return Math.max(60, Math.min(2000, rounded));
     }
 
     private void saveSummary(
             String userId,
             LocalDate weekStart,
             String content,
+            int planGoal,
             WeeklySummary cached,
             boolean force,
             int cachedRegenCount) {
@@ -150,6 +183,7 @@ public class SummaryService {
         summary.setUserId(userId);
         summary.setWeekStart(weekStart);
         summary.setContent(content);
+        summary.setPlanGoal(planGoal);
         summary.setRegenCount(cached != null && force ? cachedRegenCount + 1 : 0);
         summaryMapper.upsert(summary);
     }
@@ -185,7 +219,7 @@ public class SummaryService {
                 + "下周建议固定两个时间段运动，把打卡变成习惯。";
     }
 
-    private String callLlm(WeekStats stats) throws Exception {
+    private LlmResult callLlm(WeekStats stats) throws Exception {
         Map<String, Object> statsMap = new LinkedHashMap<>();
         statsMap.put("count", stats.count);
         statsMap.put("minutes", stats.minutes);
@@ -194,13 +228,15 @@ public class SummaryService {
 
         String prompt = "你是运动教练。用户本周数据："
                 + objectMapper.writeValueAsString(statsMap)
-                + "。写150字以内中文小结，含数据回顾、亮点、不足、下周建议。语气轻松鼓励。";
+                + "。写 150 字以内中文小结，含数据回顾、亮点、不足、下周建议，语气轻松鼓励；"
+                + "并给出下周建议的每周运动总分钟数（60–2000 的整数）。"
+                + "只输出 JSON，不要额外文字：{\"summary\":\"小结文本\",\"planGoal\":200}";
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", llmModel);
         payload.put("messages", List.of(Map.of("role", "user", "content", prompt)));
         payload.put("temperature", 0.7);
-        payload.put("max_tokens", 400);
+        payload.put("max_tokens", 600);
 
         HttpRequest httpRequest = HttpRequest.newBuilder(URI.create(llmUrl))
                 .timeout(Duration.ofSeconds(8))
@@ -219,11 +255,45 @@ public class SummaryService {
 
         JsonNode root = objectMapper.readTree(response.body());
         JsonNode contentNode = root.path("choices").path(0).path("message").path("content");
-        String content = contentNode.isTextual() ? contentNode.asText().trim() : "";
-        if (content.isEmpty()) {
+        String raw = contentNode.isTextual() ? contentNode.asText().trim() : "";
+        if (raw.isEmpty()) {
             throw new IllegalStateException("LLM empty content");
         }
-        return content;
+
+        JsonNode parsed = objectMapper.readTree(extractJson(raw));
+        String summary = parsed.path("summary").asText("").trim();
+        if (summary.isEmpty()) {
+            throw new IllegalStateException("LLM empty summary");
+        }
+        int planGoal = parsed.path("planGoal").asInt(0);
+        if (planGoal < 60 || planGoal > 2000) {
+            planGoal = suggestGoal(stats);
+        }
+        return new LlmResult(summary, planGoal);
+    }
+
+    /** 兼容模型把 JSON 包在 ```json 代码块里的情况 */
+    private static String extractJson(String raw) {
+        String text = raw.trim();
+        if (text.startsWith("```")) {
+            int firstLineEnd = text.indexOf('\n');
+            if (firstLineEnd >= 0) {
+                text = text.substring(firstLineEnd + 1);
+            }
+            if (text.endsWith("```")) {
+                text = text.substring(0, text.length() - 3);
+            }
+            text = text.trim();
+        }
+        int start = text.indexOf('{');
+        int end = text.lastIndexOf('}');
+        if (start < 0 || end <= start) {
+            return text;
+        }
+        return text.substring(start, end + 1);
+    }
+
+    private record LlmResult(String summary, int planGoal) {
     }
 
     private static class WeekStats {

@@ -11,10 +11,12 @@ import com.dongleme.backend.dto.RecordView;
 import com.dongleme.backend.dto.SummaryExportView;
 import com.dongleme.backend.entity.ActivityRoute;
 import com.dongleme.backend.entity.CheckinRecord;
+import com.dongleme.backend.entity.MakeupCard;
 import com.dongleme.backend.entity.User;
 import com.dongleme.backend.entity.WeeklySummary;
 import com.dongleme.backend.mapper.ActivityRouteMapper;
 import com.dongleme.backend.mapper.CheckinRecordMapper;
+import com.dongleme.backend.mapper.MakeupCardMapper;
 import com.dongleme.backend.mapper.SummaryMapper;
 import com.dongleme.backend.mapper.UserMapper;
 import com.dongleme.backend.security.UserLookupCache;
@@ -42,6 +44,7 @@ public class ProfileService {
     private final CheckinRecordMapper recordMapper;
     private final SummaryMapper summaryMapper;
     private final ActivityRouteMapper routeMapper;
+    private final MakeupCardMapper makeupCardMapper;
     private final UserLookupCache userLookupCache;
 
     public ProfileService(
@@ -50,12 +53,14 @@ public class ProfileService {
             CheckinRecordMapper recordMapper,
             SummaryMapper summaryMapper,
             ActivityRouteMapper routeMapper,
+            MakeupCardMapper makeupCardMapper,
             UserLookupCache userLookupCache) {
         this.authService = authService;
         this.userMapper = userMapper;
         this.recordMapper = recordMapper;
         this.summaryMapper = summaryMapper;
         this.routeMapper = routeMapper;
+        this.makeupCardMapper = makeupCardMapper;
         this.userLookupCache = userLookupCache;
     }
 
@@ -96,6 +101,15 @@ public class ProfileService {
                 }
             }
         }
+
+        // 补签日期只算打卡天，不计入时长与热量
+        makeupCardMapper.selectList(
+                        Wrappers.<MakeupCard>lambdaQuery()
+                                .eq(MakeupCard::getUserId, userId))
+                .stream()
+                .map(MakeupCard::getTargetDate)
+                .filter(date -> date != null && !date.isBefore(weekStart))
+                .forEach(weekDays::add);
 
         ProfileBasicView basic = ProfileBasicView.of(user);
         List<ProfileView.RecentRecord> recent = rows.stream()
@@ -195,6 +209,8 @@ public class ProfileService {
                 Wrappers.<CheckinRecord>lambdaQuery().eq(CheckinRecord::getUserId, userId));
         summaryMapper.delete(
                 Wrappers.<WeeklySummary>lambdaQuery().eq(WeeklySummary::getUserId, userId));
+        makeupCardMapper.delete(
+                Wrappers.<MakeupCard>lambdaQuery().eq(MakeupCard::getUserId, userId));
         userMapper.update(null, Wrappers.<User>lambdaUpdate()
                 .eq(User::getId, userId)
                 .set(User::getStreak, 0)

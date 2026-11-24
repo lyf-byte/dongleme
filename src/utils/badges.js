@@ -173,32 +173,3 @@ function resolveBadge(def, stats) {
 export function evaluateBadges(stats) {
   return DEFS.map((def) => resolveBadge(def, stats))
 }
-
-const STORE_KEY = 'dongleme.badges.unlocked'
-
-function loadUnlockedIds() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(STORE_KEY))
-    return Array.isArray(raw) ? raw : []
-  } catch {
-    return []
-  }
-}
-
-/**
- * 对比本地已解锁记录，返回本次新解锁的勋章并写入记录。
- * 在首页每次加载 profile 后调用。
- */
-export function consumeNewBadges(list) {
-  const known = new Set(loadUnlockedIds())
-  const fresh = list.filter((badge) => badge.earned && !known.has(badge.id))
-  list.forEach((badge) => {
-    if (badge.earned) known.add(badge.id)
-  })
-  try {
-    localStorage.setItem(STORE_KEY, JSON.stringify([...known]))
-  } catch {
-    /* 隐身模式等场景忽略 */
-  }
-  return fresh
-}

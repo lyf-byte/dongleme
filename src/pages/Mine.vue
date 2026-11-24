@@ -1,11 +1,12 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronRight, Flame, Route as RouteIcon, Settings } from 'lucide-vue-next'
+import { ChevronRight, Flame, Route as RouteIcon, Settings, Users } from 'lucide-vue-next'
 import { getProfile, updateProfile, errorMessage } from '../utils/api'
 import { getUser } from '../utils/auth'
 import { avatarFor } from '../utils/avatar'
 import { evaluateBadges, statsFromProfile } from '../utils/badges'
+import { syncBadges } from '../composables/useBadges'
 import { toast } from '../utils/ui'
 
 const router = useRouter()
@@ -32,7 +33,13 @@ const totals = computed(() => [
   { label: '总消耗', value: profile.value?.total?.calories || 0, unit: '千卡' }
 ])
 
-const badges = computed(() => evaluateBadges(statsFromProfile(profile.value)))
+const unlockedIds = ref(new Set())
+const badges = computed(() =>
+  evaluateBadges(statsFromProfile(profile.value)).map((badge) => ({
+    ...badge,
+    earned: badge.earned || unlockedIds.value.has(badge.id)
+  }))
+)
 const earnedCount = computed(() => badges.value.filter((item) => item.earned).length)
 const activeBadge = ref(null)
 
@@ -50,6 +57,9 @@ async function load() {
 
     const user = getUser()
     account.value = user?.username || user?.phone || user?.email || '未绑定账号'
+
+    const { ids } = await syncBadges(data)
+    unlockedIds.value = ids
   } catch (error) {
     toast(errorMessage(error, '加载资料失败'))
   } finally {
@@ -88,6 +98,8 @@ async function save() {
       profile.value.gender = form.value.gender
       profile.value.weight = weight
       profile.value.weeklyGoal = weeklyGoal
+      const { ids } = await syncBadges(profile.value)
+      unlockedIds.value = ids
     }
     toast('已保存')
   } catch (error) {
@@ -152,6 +164,14 @@ onMounted(load)
           <span class="list-text">
             <strong>运动轨迹</strong>
             <small>查看跑步、快走、骑行记录</small>
+          </span>
+          <ChevronRight :size="18" class="chev" />
+        </button>
+        <button type="button" class="list-row" @click="router.push('/feed')">
+          <span class="list-icon list-icon--violet"><Users :size="18" /></span>
+          <span class="list-text">
+            <strong>好友动态</strong>
+            <small>看看关注的人最近在运动什么</small>
           </span>
           <ChevronRight :size="18" class="chev" />
         </button>
@@ -617,6 +637,11 @@ onMounted(load)
 .list-icon--blue {
   background: var(--blue-soft);
   color: var(--blue);
+}
+
+.list-icon--violet {
+  background: var(--violet-soft);
+  color: var(--violet);
 }
 
 .list-text {

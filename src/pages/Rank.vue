@@ -1,8 +1,14 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Crown, Trophy } from 'lucide-vue-next'
-import { getRank, errorMessage } from '../utils/api'
+import { Crown, Trophy, Users } from 'lucide-vue-next'
+import {
+  getRank,
+  getFollowing,
+  followUser,
+  unfollowUser,
+  errorMessage
+} from '../utils/api'
 import { avatarFor } from '../utils/avatar'
 import { toast } from '../utils/ui'
 import emptyRank from '../assets/empty-rank.svg'
@@ -11,6 +17,8 @@ const router = useRouter()
 const loading = ref(true)
 const data = ref({ list: [], me: null })
 const scope = ref('week')
+const following = ref(new Set())
+const followBusy = ref('')
 
 const scopes = [
   { value: 'week', label: '本周' },
@@ -36,12 +44,43 @@ function medalClass(index) {
 
 async function load() {
   loading.value = true
+  const [rankResult, followResult] = await Promise.allSettled([
+    getRank(scope.value),
+    getFollowing()
+  ])
+  if (rankResult.status === 'fulfilled') {
+    data.value = rankResult.value
+  } else {
+    toast(errorMessage(rankResult.reason, '加载排行榜失败'))
+  }
+  if (followResult.status === 'fulfilled') {
+    following.value = new Set((followResult.value || []).map((user) => user.id))
+  }
+  loading.value = false
+}
+
+async function toggleFollow(item) {
+  if (followBusy.value) return
+  const on = following.value.has(item.id)
+  followBusy.value = item.id
   try {
-    data.value = await getRank(scope.value)
+    if (on) {
+      await unfollowUser(item.id)
+    } else {
+      await followUser(item.id)
+    }
+    const next = new Set(following.value)
+    if (on) {
+      next.delete(item.id)
+    } else {
+      next.add(item.id)
+    }
+    following.value = next
+    toast(on ? '已取消关注' : `已关注 ${item.nickname}`)
   } catch (error) {
-    toast(errorMessage(error, '加载排行榜失败'))
+    toast(errorMessage(error, '操作失败'))
   } finally {
-    loading.value = false
+    followBusy.value = ''
   }
 }
 
@@ -61,7 +100,14 @@ onMounted(load)
         <p class="eyebrow">{{ isWeek ? '每周一 00:00 更新' : '全部打卡累计' }}</p>
         <h1>{{ isWeek ? '本周排行' : '累计排行' }}</h1>
       </div>
-      <div class="nav-large__action"><Trophy :size="20" /></div>
+      <button
+        type="button"
+        class="nav-large__action"
+        aria-label="好友动态"
+        @click="router.push('/feed')"
+      >
+        <Users :size="20" />
+      </button>
     </header>
 
     <div class="segmented rank-seg">
@@ -132,6 +178,16 @@ onMounted(load)
             <em v-if="item.isMe">我</em>
           </span>
           <span class="rank-min">{{ item.weeklyMinutes }}<em>分钟</em></span>
+          <button
+            v-if="!item.isMe"
+            type="button"
+            class="rank-follow"
+            :class="{ on: following.has(item.id) }"
+            :disabled="followBusy === item.id"
+            @click="toggleFollow(item)"
+          >
+            {{ following.has(item.id) ? '已关注' : '关注' }}
+          </button>
         </div>
       </div>
 
@@ -237,11 +293,33 @@ onMounted(load)
 
 .rank-row {
   display: grid;
-  grid-template-columns: 26px 36px 1fr auto;
+  grid-template-columns: 26px 36px 1fr auto auto;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 12px 0;
   border-top: 1px solid var(--line);
+}
+
+.rank-follow {
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--blue);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rank-follow.on {
+  border-color: var(--line-2);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.rank-follow:disabled {
+  opacity: 0.6;
 }
 
 .rank-row:first-child {

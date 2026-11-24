@@ -15,7 +15,8 @@ import java.util.List;
 public interface UserMapper extends BaseMapper<User> {
 
     @Select("""
-            select u.id, u.nickname, u.gender, coalesce(sum(r.duration), 0) as weekly_minutes
+            select u.id, u.nickname, u.gender,
+                   cast(coalesce(sum(case when r.flagged = 1 then 0 when r.verified = 1 then r.duration else r.duration * 0.5 end), 0) as signed) as weekly_minutes
             from users u
             join records r on r.user_id = u.id and r.date >= #{weekStart}
             group by u.id, u.nickname, u.gender
@@ -24,7 +25,8 @@ public interface UserMapper extends BaseMapper<User> {
     List<RankRow> selectWeeklyRank(@Param("weekStart") LocalDate weekStart);
 
     @Select("""
-            select u.id, u.nickname, u.gender, coalesce(sum(r.duration), 0) as weekly_minutes
+            select u.id, u.nickname, u.gender,
+                   cast(coalesce(sum(case when r.flagged = 1 then 0 when r.verified = 1 then r.duration else r.duration * 0.5 end), 0) as signed) as weekly_minutes
             from users u
             join records r on r.user_id = u.id
             group by u.id, u.nickname, u.gender

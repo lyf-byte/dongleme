@@ -88,6 +88,24 @@ public interface AdminStatsMapper {
             @Param("to") LocalDate to);
 
     @Select("""
+            select r.id, r.date, r.type, r.duration, r.calories, r.user_id, u.nickname,
+                   count(*) over() as total
+            from records r
+            join users u on u.id = r.user_id
+            where r.flagged = 1
+            order by r.date desc, r.created_at desc
+            limit #{limit} offset #{offset}
+            """)
+    List<AdminRecordRow> selectFlaggedRecords(
+            @Param("limit") int limit,
+            @Param("offset") int offset);
+
+    @Select("""
+            select count(*) from records where flagged = 1
+            """)
+    long countFlaggedRecords();
+
+    @Select("""
             <script>
             select a.id, a.user_id, u.nickname, a.type, a.date, a.distance_m, a.duration_sec,
                    a.calories, a.point_count, a.created_at, a.preview,

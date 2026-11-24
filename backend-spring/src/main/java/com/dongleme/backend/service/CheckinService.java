@@ -24,6 +24,8 @@ import java.time.temporal.ChronoUnit;
 @Service
 public class CheckinService {
 
+    private static final int MANUAL_DAILY_LIMIT = 180;
+
     private final UserMapper userMapper;
     private final CheckinRecordMapper recordMapper;
     private final CustomSportMapper customSportMapper;
@@ -58,7 +60,9 @@ public class CheckinService {
                 duration,
                 request.weight(),
                 Boolean.TRUE.equals(request.overwrite()),
-                ShanghaiTime.today());
+                ShanghaiTime.today(),
+                "manual",
+                false);
         CheckinRecord record = outcome.record();
         return new CheckinResult(
                 record.getDate(),
@@ -78,7 +82,9 @@ public class CheckinService {
             int duration,
             Double weightOverride,
             boolean overwrite,
-            LocalDate date) {
+            LocalDate date,
+            String source,
+            boolean verified) {
         String normalizedType = type == null ? "" : type;
         Double met = Sports.BUILTIN_MET.get(normalizedType);
         if (met == null) {
@@ -116,6 +122,24 @@ public class CheckinService {
         record.setType(normalizedType);
         record.setDuration(duration);
         record.setCalories(calories);
+        record.setSource(source == null ? "manual" : source);
+        record.setVerified(verified ? 1 : 0);
+        int flagged = 0;
+        if (!verified) {
+            int otherManual = recordMapper.selectList(
+                    Wrappers.<CheckinRecord>lambdaQuery()
+                            .eq(CheckinRecord::getUserId, userId)
+                            .eq(CheckinRecord::getDate, checkinDate)
+                            .eq(CheckinRecord::getVerified, 0)
+                            .ne(CheckinRecord::getType, normalizedType))
+                    .stream()
+                    .mapToInt(r -> r.getDuration() == null ? 0 : r.getDuration())
+                    .sum();
+            if (otherManual + duration > MANUAL_DAILY_LIMIT) {
+                flagged = 1;
+            }
+        }
+        record.setFlagged(flagged);
 
         try {
             if (overwrite) {

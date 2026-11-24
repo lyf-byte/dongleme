@@ -11,6 +11,7 @@ public record SummaryView(
         boolean cached,
         Boolean degraded,
         Boolean empty,
-        Boolean stale
+        Boolean stale,
+        Integer planGoal
 ) {
 }

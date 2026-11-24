@@ -14,12 +14,12 @@ import {
   Target,
   Timer
 } from 'lucide-vue-next'
-import { getProfile, getCustomSports } from '../utils/api'
+import { getProfile, getCustomSports, getMakeupStatus } from '../utils/api'
 import { mergeSports } from '../utils/sport'
 import { avatarFor } from '../utils/avatar'
 import { useWeather } from '../composables/useWeather'
 import { useCountUp } from '../composables/useCountUp'
-import { consumeNewBadges, evaluateBadges, statsFromProfile } from '../utils/badges'
+import { syncBadges } from '../composables/useBadges'
 import WeatherInline from '../components/WeatherInline.vue'
 import WeatherScene from '../components/WeatherScene.vue'
 import WeatherCanvas from '../components/WeatherCanvas.vue'
@@ -28,6 +28,7 @@ import HomeSportGrid from '../components/HomeSportGrid.vue'
 import HomeRecentRecords from '../components/HomeRecentRecords.vue'
 import GoalRing from '../components/GoalRing.vue'
 import GoalSheet from '../components/GoalSheet.vue'
+import MakeupSheet from '../components/MakeupSheet.vue'
 import BadgeUnlock from '../components/BadgeUnlock.vue'
 
 const router = useRouter()
@@ -106,6 +107,8 @@ const progress = computed(() =>
 )
 const streakView = useCountUp(computed(() => profile.value?.streak || 0))
 const goalOpen = ref(false)
+const makeupOpen = ref(false)
+const makeup = ref(null)
 const unlocked = ref([])
 
 const recentRecords = computed(() => (profile.value?.recent || []).slice(0, 3))
@@ -143,15 +146,18 @@ const weekTip = computed(() => {
 async function load() {
   loading.value = true
   try {
-    const [profileResult, sportsResult] = await Promise.allSettled([
+    const [profileResult, sportsResult, makeupResult] = await Promise.allSettled([
       getProfile(),
-      getCustomSports()
+      getCustomSports(),
+      getMakeupStatus()
     ])
     profile.value = profileResult.status === 'fulfilled' ? profileResult.value : null
     customSports.value = sportsResult.status === 'fulfilled' ? sportsResult.value : []
+    makeup.value = makeupResult.status === 'fulfilled' ? makeupResult.value : null
     if (profile.value) {
-      const fresh = consumeNewBadges(evaluateBadges(statsFromProfile(profile.value)))
-      if (fresh.length) unlocked.value = fresh
+      syncBadges(profile.value).then(({ fresh }) => {
+        if (fresh.length) unlocked.value = fresh
+      })
     }
   } finally {
     loading.value = false
@@ -160,6 +166,15 @@ async function load() {
 
 function handleGoalSaved(next) {
   if (profile.value) profile.value.weeklyGoal = next
+}
+
+async function handleMakeupDone(next) {
+  makeup.value = next
+  try {
+    profile.value = await getProfile()
+  } catch {
+    /* 补签成功但资料刷新失败时保持当前数据 */
+  }
 }
 
 function handleSportsChanged(list) {
@@ -282,6 +297,15 @@ onUnmounted(() => {
             <template v-else>{{ day }}</template>
           </div>
         </div>
+
+        <button
+          v-if="makeup && makeup.remaining > 0"
+          type="button"
+          class="streak-makeup"
+          @click="makeupOpen = true"
+        >
+          漏打卡了？补签卡剩余 {{ makeup.remaining }} 张
+        </button>
       </section>
 
       <div class="today-grid">
@@ -386,6 +410,8 @@ onUnmounted(() => {
         :profile="profile"
         @saved="handleGoalSaved"
       />
+
+      <MakeupSheet v-model="makeupOpen" :status="makeup" @done="handleMakeupDone" />
 
       <BadgeUnlock :badges="unlocked" @close="unlocked = []" />
     </template>
@@ -613,6 +639,22 @@ onUnmounted(() => {
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
   margin-top: 16px;
+}
+
+.streak-makeup {
+  position: relative;
+  z-index: 2;
+  display: block;
+  margin: 10px auto 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 11px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
 .week-strip__day {

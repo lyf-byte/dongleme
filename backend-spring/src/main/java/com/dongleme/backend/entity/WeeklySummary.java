@@ -24,6 +24,9 @@ public class WeeklySummary {
 
     private String content;
 
+    @TableField("plan_goal")
+    private Integer planGoal;
+
     @TableField("regen_count")
     private Integer regenCount;
 

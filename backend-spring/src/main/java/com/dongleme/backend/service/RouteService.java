@@ -119,7 +119,9 @@ public class RouteService {
                 minutes,
                 null,
                 Boolean.TRUE.equals(request.overwrite()),
-                date);
+                date,
+                "route",
+                true);
 
         ActivityRoute route = new ActivityRoute();
         route.setUserId(userId);

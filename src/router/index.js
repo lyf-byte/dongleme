@@ -24,6 +24,7 @@ const routes = [
   },
   { path: '/stats', name: 'stats', component: () => import('../pages/Stats.vue') },
   { path: '/rank', name: 'rank', component: () => import('../pages/Rank.vue') },
+  { path: '/feed', name: 'feed', component: () => import('../pages/Feed.vue') },
   { path: '/summary', name: 'summary', component: () => import('../pages/Summary.vue') },
   { path: '/mine', name: 'mine', component: () => import('../pages/Mine.vue') },
   { path: '/settings', name: 'settings', component: () => import('../pages/Settings.vue') },
@@ -51,6 +52,11 @@ const routes = [
         path: 'records',
         name: 'admin-records',
         component: () => import('../pages/admin/AdminRecords.vue')
+      },
+      {
+        path: 'flagged',
+        name: 'admin-flagged',
+        component: () => import('../pages/admin/AdminFlagged.vue')
       },
       {
         path: 'routes',

@@ -72,6 +72,7 @@ public class AdminService {
     private final AdminStatsMapper adminStatsMapper;
     private final UserLookupCache userLookupCache;
     private final ObjectMapper objectMapper;
+    private final StreakService streakService;
 
     public AdminService(
             UserMapper userMapper,
@@ -79,13 +80,15 @@ public class AdminService {
             ActivityRouteMapper routeMapper,
             AdminStatsMapper adminStatsMapper,
             UserLookupCache userLookupCache,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            StreakService streakService) {
         this.userMapper = userMapper;
         this.recordMapper = recordMapper;
         this.routeMapper = routeMapper;
         this.adminStatsMapper = adminStatsMapper;
         this.userLookupCache = userLookupCache;
         this.objectMapper = objectMapper;
+        this.streakService = streakService;
     }
 
     public AdminOverviewView overview() {
@@ -284,6 +287,51 @@ public class AdminService {
         return new AdminRecordsView(records, total, safePage, safeSize);
     }
 
+    public AdminRecordsView flagged(int page, int pageSize) {
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(pageSize, 1), 50);
+        int offset = (safePage - 1) * safeSize;
+
+        List<AdminRecordRow> rows = adminStatsMapper.selectFlaggedRecords(safeSize, offset);
+
+        long total;
+        if (!rows.isEmpty()) {
+            total = rows.get(0).getTotal() == null ? rows.size() : rows.get(0).getTotal();
+        } else if (safePage == 1) {
+            total = 0;
+        } else {
+            total = adminStatsMapper.countFlaggedRecords();
+        }
+
+        List<AdminRecordView> records = rows.stream()
+                .map(row -> new AdminRecordView(
+                        row.getId(),
+                        row.getDate(),
+                        row.getType(),
+                        row.getDuration() == null ? 0 : row.getDuration(),
+                        row.getCalories() == null ? 0 : row.getCalories(),
+                        row.getUserId(),
+                        row.getNickname() == null ? "运动新人" : row.getNickname()))
+                .toList();
+
+        return new AdminRecordsView(records, total, safePage, safeSize);
+    }
+
+    public Map<String, Object> approve(String id) {
+        if (id == null || id.isBlank()) {
+            throw ApiException.badRequest("缺少 id");
+        }
+        CheckinRecord record = recordMapper.selectById(parseId(id));
+        if (record == null) {
+            throw ApiException.notFound("记录不存在");
+        }
+        recordMapper.update(null, Wrappers.<CheckinRecord>lambdaUpdate()
+                .eq(CheckinRecord::getId, record.getId())
+                .set(CheckinRecord::getVerified, 1)
+                .set(CheckinRecord::getFlagged, 0));
+        return Map.of("ok", true);
+    }
+
     public AdminRouteListView routes(
             String queryParam,
             String type,
@@ -369,7 +417,7 @@ public class AdminService {
                 throw ApiException.notFound("记录不存在");
             }
             recordMapper.deleteById(record.getId());
-            recalculateStreak(record.getUserId());
+            streakService.recalculate(record.getUserId());
             return Map.of("ok", true);
         }
 
@@ -391,39 +439,6 @@ public class AdminService {
         } catch (NumberFormatException exception) {
             throw ApiException.notFound("数据不存在");
         }
-    }
-
-    private void recalculateStreak(String userId) {
-        List<CheckinRecord> rows = recordMapper.selectList(
-                Wrappers.<CheckinRecord>lambdaQuery()
-                        .eq(CheckinRecord::getUserId, userId));
-
-        Set<LocalDate> dates = rows.stream()
-                .map(CheckinRecord::getDate)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-
-        if (dates.isEmpty()) {
-            userMapper.update(null, Wrappers.<User>lambdaUpdate()
-                    .eq(User::getId, userId)
-                    .set(User::getStreak, 0)
-                    .set(User::getLastCheckDate, null));
-            userLookupCache.invalidate(userId);
-            return;
-        }
-
-        LocalDate latest = dates.stream().max(LocalDate::compareTo).orElseThrow();
-        int streak = 1;
-        for (LocalDate cursor = latest.minusDays(1); dates.contains(cursor); cursor = cursor.minusDays(1)) {
-            streak++;
-        }
-
-        User patch = new User();
-        patch.setId(userId);
-        patch.setStreak(streak);
-        patch.setLastCheckDate(latest);
-        userMapper.updateById(patch);
-        userLookupCache.invalidate(userId);
     }
 
     private AdminUserView toUserView(AdminUserRow row) {

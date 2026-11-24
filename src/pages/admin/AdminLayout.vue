@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   LogOut,
   Route as RouteIcon,
+  ShieldAlert,
   Trophy,
   UserRound,
   Users
@@ -25,6 +26,7 @@ const groups = [
       { label: '数据概览', path: '/admin', icon: LayoutDashboard },
       { label: '用户管理', path: '/admin/users', icon: Users },
       { label: '打卡记录', path: '/admin/records', icon: ClipboardList },
+      { label: '异常打卡', path: '/admin/flagged', icon: ShieldAlert },
       { label: '运动轨迹', path: '/admin/routes', icon: RouteIcon }
     ]
   },

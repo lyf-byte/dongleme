@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { Copy, Download, RefreshCw, Sparkles } from 'lucide-vue-next'
-import { generateSummary, errorMessage } from '../utils/api'
+import { generateSummary, getProfile, updateProfile, errorMessage } from '../utils/api'
 import { toast } from '../utils/ui'
 import { saveBlob } from '../utils/native'
 import emptySummary from '../assets/empty-summary.svg'
@@ -21,7 +21,14 @@ const weekStart = ref('')
 const cached = ref(false)
 const degraded = ref(false)
 const stale = ref(false)
+const planGoal = ref(0)
+const profile = ref(null)
+const applying = ref(false)
 const errorText = ref('')
+
+const isCurrentGoal = computed(
+  () => Boolean(profile.value && planGoal.value && profile.value.weeklyGoal === planGoal.value)
+)
 
 const weekLabel = computed(() => {
   if (!weekStart.value) return ''
@@ -37,6 +44,7 @@ async function peek() {
   try {
     const result = await generateSummary({ peek: true })
     weekStart.value = result.weekStart || ''
+    planGoal.value = result.planGoal || 0
     if (result.content) {
       content.value = result.content
       cached.value = result.cached
@@ -57,6 +65,7 @@ async function generate(force = false) {
     const result = await generateSummary(force ? { force: true } : {})
     weekStart.value = result.weekStart || weekStart.value
     content.value = result.content || ''
+    planGoal.value = result.planGoal || 0
     cached.value = Boolean(result.cached)
     degraded.value = Boolean(result.degraded)
     stale.value = false
@@ -150,7 +159,38 @@ async function savePoster() {
   }
 }
 
-onMounted(peek)
+async function applyPlan() {
+  if (!planGoal.value || applying.value) return
+  applying.value = true
+  try {
+    if (!profile.value) {
+      profile.value = await getProfile()
+    }
+    await updateProfile({
+      nickname: profile.value.nickname,
+      gender: profile.value.gender || 'secret',
+      weight: profile.value.weight,
+      weeklyGoal: planGoal.value
+    })
+    profile.value.weeklyGoal = planGoal.value
+    toast(`本周目标已更新为 ${planGoal.value} 分钟`)
+  } catch (error) {
+    toast(errorMessage(error, '设置失败'))
+  } finally {
+    applying.value = false
+  }
+}
+
+onMounted(() => {
+  peek()
+  getProfile()
+    .then((data) => {
+      profile.value = data
+    })
+    .catch(() => {
+      /* 资料加载失败时按钮仍可点，点击时会重试 */
+    })
+})
 </script>
 
 <template>
@@ -181,6 +221,21 @@ onMounted(peek)
         </div>
 
         <p class="report-text">{{ content }}</p>
+
+        <div v-if="planGoal" class="plan-card">
+          <div class="plan-info">
+            <span>AI 下周计划</span>
+            <strong>{{ planGoal }} 分钟 / 周</strong>
+          </div>
+          <button
+            type="button"
+            class="btn-primary btn-sm"
+            :disabled="applying || isCurrentGoal"
+            @click="applyPlan"
+          >
+            {{ isCurrentGoal ? '已是本周目标' : applying ? '设置中…' : '设为本周目标' }}
+          </button>
+        </div>
 
         <p v-if="stale" class="report-note">
           本周有新打卡记录，建议重新生成小结。
@@ -288,6 +343,36 @@ onMounted(peek)
   line-height: 26px;
   color: var(--text);
   white-space: pre-wrap;
+}
+
+.plan-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px dashed var(--blue);
+  border-radius: 14px;
+  background: var(--blue-soft);
+}
+
+.plan-info span {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.plan-info strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+.plan-card .btn-primary {
+  flex: 0 0 auto;
 }
 
 .report-note {

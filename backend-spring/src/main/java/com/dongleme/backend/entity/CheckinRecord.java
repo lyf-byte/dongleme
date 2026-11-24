@@ -26,6 +26,9 @@ public class CheckinRecord {
     private Integer duration;
 
     private Integer calories;
+    private String source;
+    private Integer verified;
+    private Integer flagged;
 
     @TableField("created_at")
     private LocalDateTime createdAt;

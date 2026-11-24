@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -47,6 +48,7 @@ public class AdminController {
             case "users" -> adminService.users(query, filter, sort, page, pageSize);
             case "user" -> adminService.userDetail(requireId(id));
             case "records" -> adminService.records(query, type, from, to, page, pageSize);
+            case "flagged" -> adminService.flagged(page, pageSize);
             case "routes" -> adminService.routes(query, type, from, to, page, pageSize);
             case "rank" -> adminService.rank(scope);
             case "types" -> Map.of("types", adminService.types());
@@ -63,6 +65,20 @@ public class AdminController {
             throw ApiException.unauthorized("登录已过期，请重新登录");
         }
         return adminService.delete(action == null ? "" : action, id, principal.id());
+    }
+
+    @PostMapping
+    public Map<String, Object> post(
+            @AuthenticationPrincipal AuthUser principal,
+            @RequestParam(name = "action", required = false) String action,
+            @RequestParam(name = "id", required = false) String id) {
+        if (principal == null) {
+            throw ApiException.unauthorized("登录已过期，请重新登录");
+        }
+        if ("approve".equals(action)) {
+            return adminService.approve(id);
+        }
+        throw new ApiException(HttpStatus.NOT_FOUND, "未知的后台操作");
     }
 
     private static String requireId(String id) {

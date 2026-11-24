@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS records (
   type VARCHAR(20) NOT NULL,
   duration INT NOT NULL,
   calories INT NOT NULL,
+  source VARCHAR(16) NOT NULL DEFAULT 'manual',
+  verified TINYINT NOT NULL DEFAULT 0,
+  flagged TINYINT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_records_user_date_type (user_id, date, type),
   KEY idx_records_date (date),
@@ -51,6 +54,7 @@ CREATE TABLE IF NOT EXISTS summaries (
   user_id CHAR(36) NOT NULL,
   week_start DATE NOT NULL,
   content TEXT NOT NULL,
+  plan_goal INT NULL,
   regen_count INT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_summaries_user_week (user_id, week_start),
@@ -95,3 +99,35 @@ CREATE TABLE IF NOT EXISTS activity_routes (
   CONSTRAINT chk_routes_duration CHECK (duration_sec BETWEEN 60 AND 21600),
   CONSTRAINT chk_routes_distance CHECK (distance_m >= 0)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS user_badges (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL,
+  badge_id VARCHAR(64) NOT NULL,
+  unlocked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_user_badge (user_id, badge_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS makeup_cards (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL,
+  target_date DATE NOT NULL,
+  used_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_makeup_user_date (user_id, target_date),
+  KEY idx_makeup_user_used (user_id, used_at)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS follows (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  follower_id CHAR(36) NOT NULL,
+  followee_id CHAR(36) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_follow_pair (follower_id, followee_id),
+  KEY idx_follow_followee (followee_id),
+  CONSTRAINT fk_follows_follower FOREIGN KEY (follower_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_follows_followee FOREIGN KEY (followee_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+-- 迁移（已有库执行一次）：
+-- ALTER TABLE records ADD COLUMN source VARCHAR(16) NOT NULL DEFAULT 'manual', ADD COLUMN verified TINYINT NOT NULL DEFAULT 0, ADD COLUMN flagged TINYINT NOT NULL DEFAULT 0;
+-- ALTER TABLE summaries ADD COLUMN plan_goal INT NULL;

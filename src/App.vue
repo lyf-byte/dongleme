@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { House, ChartBar, Trophy, Sparkles, User } from 'lucide-vue-next'
 import UiHost from './components/UiHost.vue'
+import ReminderBanner from './components/ReminderBanner.vue'
 
 const route = useRoute()
 
@@ -47,6 +48,8 @@ const showTabbar = computed(() => (
         <span>{{ item.label }}</span>
       </router-link>
     </nav>
+
+    <ReminderBanner />
 
     <UiHost />
   </div>
