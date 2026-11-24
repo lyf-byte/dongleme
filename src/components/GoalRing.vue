@@ -65,6 +65,10 @@ const half = computed(() => props.size / 2)
   flex: 0 0 auto;
 }
 
+.goal-ring svg {
+  overflow: visible;
+}
+
 .goal-ring__track {
   fill: none;
   stroke: var(--blue-soft);
@@ -72,7 +76,7 @@ const half = computed(() => props.size / 2)
 
 .goal-ring__bar {
   fill: none;
-  filter: drop-shadow(0 2px 6px rgba(79, 139, 255, 0.45));
+  filter: drop-shadow(0 1px 3px rgba(79, 139, 255, 0.22));
   transition: stroke-dasharray 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
