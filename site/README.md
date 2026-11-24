@@ -6,8 +6,11 @@
 site/
 ├── index.html      # 页面结构
 ├── styles.css      # 全部样式
-├── app.js          # 滚动入场、导航状态、APK 降级
-├── assets/         # 压缩后的海报与 logo
+├── app.js          # 滚动入场、手机导航状态、APK 降级
+├── privacy.html    # 隐私政策
+├── terms.html      # 使用条款
+├── assets/         # 海报、真实产品截图与 logo
+├── tests/          # 无依赖静态站点检查
 └── download/       # 放 APK 的位置
 ```
 
@@ -19,7 +22,17 @@ python -m http.server 4321
 # 打开 http://127.0.0.1:4321
 ```
 
-直接双击 `index.html` 也能看，只是 APK 存在性检查（HEAD 请求）在 `file://` 下会被跳过。
+直接双击 `index.html` 也能看。页面默认展示全部内容，JavaScript 只负责渐进启用入场动画；APK 存在性检查（HEAD 请求）在 `file://` 下会保留原始下载链接。
+
+## 检查
+
+在仓库根目录执行：
+
+```bash
+npm run test:site
+```
+
+检查手机锚点、首屏动画、无 JavaScript 兜底、APK 缺失与网络异常降级、协议链接和产品素材。
 
 ## 放 APK
 
@@ -39,9 +52,9 @@ scp dongleme.apk ubuntu@<服务器>:/opt/donglemei/site/download/
 
 ## 需要改的地方
 
-域名写在 `index.html` 里，共 4 处 `https://dongleme.xyz`（导航 CTA、首屏「在线体验」、下载区的网页版按钮、页脚）。换域名时全局替换即可。
+应用域名写在 `index.html` 里（导航 CTA、首屏「在线体验」、下载区的网页版按钮和页脚入口）。换域名时在 `index.html` 与 `app.js` 中全局替换 `https://dongleme.xyz`；`app.js` 中的地址用于 APK 缺失或网络异常时跳转网页版。
 
-`app.js` 里也有一处，是 APK 缺失时的兜底跳转地址。
+`privacy.html` 和 `terms.html` 是独立静态页面，部署 `site/` 时会一起上传。修改条款后，请同步核对应用内 `Auth.vue` 与 `Settings.vue` 的隐私说明，避免文案和实际数据处理不一致。
 
 ## 部署（已上线）
 

@@ -11,6 +11,7 @@
     "build": "vite build",
     "build:native": "vite build --mode native",
     "preview": "vite preview",
+    "test:site": "node --test site/tests/*.test.js",
     "test:backend": "mvn -f backend-spring/pom.xml test"
   },
   "dependencies": {
