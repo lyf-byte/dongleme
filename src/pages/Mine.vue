@@ -441,6 +441,7 @@ onMounted(load)
 .badge-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 112px;
   gap: 10px;
 }
 
@@ -510,9 +511,13 @@ onMounted(load)
 }
 
 .badge-card small {
+  display: -webkit-box;
+  overflow: hidden;
   font-size: 10px;
   line-height: 14px;
   color: var(--muted);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .badge-overlay {
