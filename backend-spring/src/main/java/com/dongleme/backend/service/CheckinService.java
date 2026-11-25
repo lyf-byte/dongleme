@@ -26,10 +26,6 @@ public class CheckinService {
 
     /** 单次手动/计时器打卡时长上限（分钟） */
     private static final int MANUAL_SESSION_MAX = 240;
-    /** 每日手动/计时器打卡累计上限（分钟），GPS 轨迹不受此限 */
-    private static final int MANUAL_DAILY_MAX = 300;
-    /** 每日手动累计超过该值标记为待审核（分钟） */
-    private static final int MANUAL_FLAG_LIMIT = 180;
 
     private final UserMapper userMapper;
     private final CheckinRecordMapper recordMapper;
@@ -132,27 +128,8 @@ public class CheckinService {
         record.setCalories(calories);
         record.setSource(source == null ? "manual" : source);
         record.setVerified(verified ? 1 : 0);
-        int flagged = 0;
-        if (!verified) {
-            int otherManual = recordMapper.selectList(
-                    Wrappers.<CheckinRecord>lambdaQuery()
-                            .eq(CheckinRecord::getUserId, userId)
-                            .eq(CheckinRecord::getDate, checkinDate)
-                            .eq(CheckinRecord::getVerified, 0)
-                            .ne(CheckinRecord::getType, normalizedType))
-                    .stream()
-                    .mapToInt(r -> r.getDuration() == null ? 0 : r.getDuration())
-                    .sum();
-            if (otherManual + duration > MANUAL_DAILY_MAX) {
-                throw ApiException.badRequest(
-                        "今日手动打卡累计不能超过 " + MANUAL_DAILY_MAX
-                                + " 分钟，长时间运动请使用轨迹记录");
-            }
-            if (otherManual + duration > MANUAL_FLAG_LIMIT) {
-                flagged = 1;
-            }
-        }
-        record.setFlagged(flagged);
+        // 有效时长在统计时按「每日手动封顶 240 分钟」截断，记录本身保留真实值
+        record.setFlagged(0);
 
         try {
             if (overwrite) {

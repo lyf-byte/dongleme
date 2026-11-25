@@ -8,6 +8,7 @@ import com.dongleme.backend.dto.StatsTotals;
 import com.dongleme.backend.dto.StatsView;
 import com.dongleme.backend.entity.CheckinRecord;
 import com.dongleme.backend.mapper.CheckinRecordMapper;
+import com.dongleme.backend.mapper.RecordMetrics;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -52,24 +53,24 @@ public class StatsService {
         Map<String, Integer> typeMap = new LinkedHashMap<>();
         int minutesTotal = 0;
         int caloriesTotal = 0;
+        int recordCount = 0;
 
         for (CheckinRecord row : rows) {
+            if (row.getFlagged() != null && row.getFlagged() == 1) {
+                continue;
+            }
+            recordCount += 1;
+            DayAggregate day = dayMap.computeIfAbsent(row.getDate(), key -> new DayAggregate());
             int duration = row.getDuration() == null ? 0 : row.getDuration();
             int calories = row.getCalories() == null ? 0 : row.getCalories();
-            boolean flagged = row.getFlagged() != null && row.getFlagged() == 1;
-            int effectiveDuration = flagged ? 0 : duration;
-            int effectiveCalories = flagged ? 0 : calories;
-            minutesTotal += effectiveDuration;
-            caloriesTotal += effectiveCalories;
-            if (effectiveDuration > 0) {
-                typeMap.merge(row.getType(), effectiveDuration, Integer::sum);
-            }
-
-            DayAggregate day = dayMap.computeIfAbsent(row.getDate(), key -> new DayAggregate());
-            day.minutes += effectiveDuration;
-            day.calories += effectiveCalories;
-            if (effectiveDuration > 0) {
-                day.types.merge(row.getType(), effectiveDuration, Integer::sum);
+            if (row.getVerified() != null && row.getVerified() == 1) {
+                day.routeMinutes += duration;
+                day.routeCalories += calories;
+                day.routeTypes.merge(row.getType(), duration, Integer::sum);
+            } else {
+                day.manualMinutes += duration;
+                day.manualCalories += calories;
+                day.manualTypes.merge(row.getType(), duration, Integer::sum);
             }
         }
 
@@ -78,9 +79,19 @@ public class StatsService {
             DayAggregate day = dayMap.get(date);
             if (day == null) {
                 daily.add(new StatsDaily(date, 0, 0, Map.of()));
-            } else {
-                daily.add(new StatsDaily(date, day.minutes, day.calories, day.types));
+                continue;
             }
+            int minutes = day.effectiveMinutes();
+            int calories = day.effectiveCalories();
+            Map<String, Integer> types = day.effectiveTypes();
+            minutesTotal += minutes;
+            caloriesTotal += calories;
+            types.forEach((type, value) -> {
+                if (value > 0) {
+                    typeMap.merge(type, value, Integer::sum);
+                }
+            });
+            daily.add(new StatsDaily(date, minutes, calories, types));
         }
 
         return new StatsView(
@@ -89,13 +100,47 @@ public class StatsService {
                 today,
                 daily,
                 typeMap,
-                new StatsTotals(rows.size(), minutesTotal, caloriesTotal)
+                new StatsTotals(recordCount, minutesTotal, caloriesTotal)
         );
     }
 
     private static class DayAggregate {
-        private int minutes;
-        private int calories;
-        private final Map<String, Integer> types = new LinkedHashMap<>();
+        private int routeMinutes;
+        private int manualMinutes;
+        private int routeCalories;
+        private int manualCalories;
+        private final Map<String, Integer> routeTypes = new LinkedHashMap<>();
+        private final Map<String, Integer> manualTypes = new LinkedHashMap<>();
+
+        private int effectiveMinutes() {
+            return routeMinutes
+                    + Math.min(RecordMetrics.DAILY_MANUAL_CAP, manualMinutes);
+        }
+
+        private int cappedManualCalories() {
+            if (manualMinutes <= 0) {
+                return 0;
+            }
+            int capped = Math.min(RecordMetrics.DAILY_MANUAL_CAP, manualMinutes);
+            if (capped >= manualMinutes) {
+                return manualCalories;
+            }
+            return (int) Math.round(manualCalories * (capped / (double) manualMinutes));
+        }
+
+        private int effectiveCalories() {
+            return routeCalories + cappedManualCalories();
+        }
+
+        private Map<String, Integer> effectiveTypes() {
+            Map<String, Integer> merged = new LinkedHashMap<>(routeTypes);
+            if (!manualTypes.isEmpty()) {
+                int capped = Math.min(RecordMetrics.DAILY_MANUAL_CAP, manualMinutes);
+                double ratio = manualMinutes <= 0 ? 0 : capped / (double) manualMinutes;
+                manualTypes.forEach((type, value) ->
+                        merged.merge(type, (int) Math.round(value * ratio), Integer::sum));
+            }
+            return merged;
+        }
     }
 }

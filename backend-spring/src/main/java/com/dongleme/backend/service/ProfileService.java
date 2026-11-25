@@ -17,6 +17,7 @@ import com.dongleme.backend.entity.WeeklySummary;
 import com.dongleme.backend.mapper.ActivityRouteMapper;
 import com.dongleme.backend.mapper.CheckinRecordMapper;
 import com.dongleme.backend.mapper.MakeupCardMapper;
+import com.dongleme.backend.mapper.RecordMetrics;
 import com.dongleme.backend.mapper.SummaryMapper;
 import com.dongleme.backend.mapper.UserMapper;
 import com.dongleme.backend.security.UserLookupCache;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -78,38 +80,48 @@ public class ProfileService {
         int todayPendingMinutes = 0;
         int todayPendingCalories = 0;
         int weekMinutes = 0;
-        double weekMinutesValue = 0;
         Set<LocalDate> weekDays = new LinkedHashSet<>();
         Set<String> todayTypes = new LinkedHashSet<>();
+        Map<LocalDate, DayTotals> days = new HashMap<>();
 
         for (CheckinRecord row : rows) {
-            int duration = row.getDuration() == null ? 0 : row.getDuration();
-            int calories = row.getCalories() == null ? 0 : row.getCalories();
-            boolean flagged = row.getFlagged() != null && row.getFlagged() == 1;
-            int effectiveDuration = flagged ? 0 : duration;
-            int effectiveCalories = flagged ? 0 : calories;
-            totalMinutes += effectiveDuration;
-            totalCalories += effectiveCalories;
-
             LocalDate date = row.getDate();
             if (date == null) {
                 continue;
             }
             if (!date.isBefore(weekStart)) {
-                weekMinutesValue += effectiveMinutes(row);
                 weekDays.add(date);
             }
-            if (today.equals(date)) {
-                todayMinutes += effectiveDuration;
-                todayCalories += effectiveCalories;
-                if (flagged) {
-                    todayPendingMinutes += duration;
-                    todayPendingCalories += calories;
-                }
-                if (row.getType() != null) {
-                    todayTypes.add(row.getType());
-                }
+            if (today.equals(date) && row.getType() != null) {
+                todayTypes.add(row.getType());
             }
+            if (row.getFlagged() != null && row.getFlagged() == 1) {
+                continue;
+            }
+            DayTotals day = days.computeIfAbsent(date, key -> new DayTotals());
+            int duration = row.getDuration() == null ? 0 : row.getDuration();
+            int calories = row.getCalories() == null ? 0 : row.getCalories();
+            if (row.getVerified() != null && row.getVerified() == 1) {
+                day.routeMinutes += duration;
+                day.routeCalories += calories;
+            } else {
+                day.manualMinutes += duration;
+                day.manualCalories += calories;
+            }
+        }
+
+        for (DayTotals day : days.values()) {
+            totalMinutes += effectiveMinutes(day);
+            totalCalories += effectiveCalories(day);
+        }
+        DayTotals todayTotals = days.get(today);
+        if (todayTotals != null) {
+            todayMinutes = effectiveMinutes(todayTotals);
+            todayCalories = effectiveCalories(todayTotals);
+            todayPendingMinutes = Math.max(0,
+                    todayTotals.manualMinutes - RecordMetrics.DAILY_MANUAL_CAP);
+            todayPendingCalories = Math.max(0,
+                    todayTotals.manualCalories - cappedManualCalories(todayTotals));
         }
 
         // 补签日期只算打卡天，不计入时长与热量
@@ -121,8 +133,12 @@ public class ProfileService {
                 .filter(date -> date != null && !date.isBefore(weekStart))
                 .forEach(weekDays::add);
 
-        // 周时长与排行榜、好友、后台统一使用有效分钟口径
-        weekMinutes = (int) Math.round(weekMinutesValue);
+        // 周时长与排行榜、好友、后台统一使用「每日手动封顶 + 轨迹全额」口径
+        for (Map.Entry<LocalDate, DayTotals> entry : days.entrySet()) {
+            if (!entry.getKey().isBefore(weekStart)) {
+                weekMinutes += effectiveMinutes(entry.getValue());
+            }
+        }
         ProfileBasicView basic = ProfileBasicView.of(user);
         List<ProfileView.RecentRecord> recent = rows.stream()
                 .filter(row -> row.getId() != null)
@@ -156,12 +172,31 @@ public class ProfileService {
         );
     }
 
-    private static double effectiveMinutes(CheckinRecord record) {
-        int duration = record.getDuration() == null ? 0 : record.getDuration();
-        if (record.getFlagged() != null && record.getFlagged() == 1) {
+    private static int effectiveMinutes(DayTotals day) {
+        return day.routeMinutes + Math.min(RecordMetrics.DAILY_MANUAL_CAP, day.manualMinutes);
+    }
+
+    /** 手动部分按有效分钟占比折算热量，超出每日上限的部分不计 */
+    private static int cappedManualCalories(DayTotals day) {
+        if (day.manualMinutes <= 0) {
             return 0;
         }
-        return duration;
+        int capped = Math.min(RecordMetrics.DAILY_MANUAL_CAP, day.manualMinutes);
+        if (capped >= day.manualMinutes) {
+            return day.manualCalories;
+        }
+        return (int) Math.round(day.manualCalories * (capped / (double) day.manualMinutes));
+    }
+
+    private static int effectiveCalories(DayTotals day) {
+        return day.routeCalories + cappedManualCalories(day);
+    }
+
+    private static final class DayTotals {
+        private int routeMinutes;
+        private int manualMinutes;
+        private int routeCalories;
+        private int manualCalories;
     }
 
     public ExportView export(String userId) {

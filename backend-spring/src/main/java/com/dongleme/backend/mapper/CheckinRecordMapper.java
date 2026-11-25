@@ -36,9 +36,9 @@ public interface CheckinRecordMapper extends BaseMapper<CheckinRecord> {
             """)
     long countByDate(@Param("date") LocalDate date);
 
-    @Select("select cast(coalesce(sum("
-            + RecordMetrics.EFFECTIVE_MINUTES
-            + "), 0) as signed) from records r where r.date >= #{weekStart}")
+    @Select("select cast(coalesce(sum(d.day_minutes), 0) as signed) from ("
+            + RecordMetrics.EFFECTIVE_DAY_MINUTES_SQL
+            + ") d where d.date >= #{weekStart}")
     long sumMinutesSince(@Param("weekStart") LocalDate weekStart);
 
     @Select("""

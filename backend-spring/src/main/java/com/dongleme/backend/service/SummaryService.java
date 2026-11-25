@@ -8,6 +8,7 @@ import com.dongleme.backend.dto.SummaryView;
 import com.dongleme.backend.entity.CheckinRecord;
 import com.dongleme.backend.entity.WeeklySummary;
 import com.dongleme.backend.mapper.CheckinRecordMapper;
+import com.dongleme.backend.mapper.RecordMetrics;
 import com.dongleme.backend.mapper.SummaryMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -200,18 +201,54 @@ public class SummaryService {
 
     private WeekStats aggregate(List<CheckinRecord> rows) {
         WeekStats stats = new WeekStats();
+        Map<LocalDate, DayTotals> days = new LinkedHashMap<>();
         for (CheckinRecord row : rows) {
-            int duration = row.getDuration() == null ? 0 : row.getDuration();
-            boolean flagged = row.getFlagged() != null && row.getFlagged() == 1;
-            int effectiveDuration = flagged ? 0 : duration;
+            if (row.getFlagged() != null && row.getFlagged() == 1) {
+                continue;
+            }
+            LocalDate date = row.getDate();
+            if (date == null) {
+                continue;
+            }
             stats.count += 1;
-            stats.minutes += effectiveDuration;
-            stats.calories += flagged || row.getCalories() == null ? 0 : row.getCalories();
-            if (effectiveDuration > 0) {
-                stats.types.merge(row.getType(), effectiveDuration, Integer::sum);
+            DayTotals day = days.computeIfAbsent(date, key -> new DayTotals());
+            int duration = row.getDuration() == null ? 0 : row.getDuration();
+            int calories = row.getCalories() == null ? 0 : row.getCalories();
+            if (row.getVerified() != null && row.getVerified() == 1) {
+                day.routeMinutes += duration;
+                day.routeCalories += calories;
+                day.routeTypes.merge(row.getType(), duration, Integer::sum);
+            } else {
+                day.manualMinutes += duration;
+                day.manualCalories += calories;
+                day.manualTypes.merge(row.getType(), duration, Integer::sum);
             }
         }
+        for (DayTotals day : days.values()) {
+            int cappedManual = Math.min(RecordMetrics.DAILY_MANUAL_CAP, day.manualMinutes);
+            stats.minutes += day.routeMinutes + cappedManual;
+            int manualCalories = day.manualMinutes <= 0
+                    ? 0
+                    : (int) Math.round(day.manualCalories
+                            * (cappedManual / (double) day.manualMinutes));
+            stats.calories += day.routeCalories + manualCalories;
+            stats.types.putAll(day.routeTypes);
+            double ratio = day.manualMinutes <= 0
+                    ? 0
+                    : cappedManual / (double) day.manualMinutes;
+            day.manualTypes.forEach((type, value) ->
+                    stats.types.merge(type, (int) Math.round(value * ratio), Integer::sum));
+        }
         return stats;
+    }
+
+    private static class DayTotals {
+        private int routeMinutes;
+        private int manualMinutes;
+        private int routeCalories;
+        private int manualCalories;
+        private final Map<String, Integer> routeTypes = new LinkedHashMap<>();
+        private final Map<String, Integer> manualTypes = new LinkedHashMap<>();
     }
 
     private String buildFallback(WeekStats stats) {

@@ -13,8 +13,9 @@ import java.util.List;
 public interface FollowMapper extends BaseMapper<Follow> {
 
     @Select("select u.id, u.nickname, u.gender, "
-            + "(select cast(coalesce(sum(" + RecordMetrics.EFFECTIVE_MINUTES + "), 0) as signed) from records r "
-            + "where r.user_id = u.id and r.date >= #{weekStart}) as weekly_minutes "
+            + "(select cast(coalesce(sum(d.day_minutes), 0) as signed) from ("
+            + RecordMetrics.EFFECTIVE_DAY_MINUTES_SQL
+            + ") d where d.user_id = u.id and d.date >= #{weekStart}) as weekly_minutes "
             + "from follows f "
             + "join users u on u.id = f.followee_id "
             + "where f.follower_id = #{userId} "

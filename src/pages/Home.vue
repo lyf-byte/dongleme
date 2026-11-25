@@ -315,7 +315,7 @@ onUnmounted(() => {
           <p>今日运动</p>
           <strong>{{ today.minutes }}<span>分钟</span></strong>
           <small v-if="today.pendingMinutes" class="today-pending">
-            另有 {{ today.pendingMinutes }} 分钟待审核
+            超出上限 {{ today.pendingMinutes }} 分钟
           </small>
         </div>
         <div class="card today-card">

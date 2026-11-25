@@ -119,24 +119,20 @@ class CheckinServiceTest {
         }
 
         @Test
-        @DisplayName("每日手动累计超过 300 分钟被拒绝")
-        void rejectsDailyAccumulation() {
+        @DisplayName("单日多次手动打卡都允许保存，统计时按每日上限截断")
+        void allowsMultipleManualCheckinsPerDay() {
             when(userMapper.selectById(USER_ID)).thenReturn(user("male", "60", 0, null));
-            CheckinRecord existing = new CheckinRecord();
-            existing.setType("游泳");
-            existing.setDuration(200);
-            existing.setVerified(0);
-            when(recordMapper.selectList(any())).thenReturn(java.util.List.of(existing));
+            when(recordMapper.insert(any(CheckinRecord.class))).thenReturn(1);
 
-            assertThatThrownBy(() -> checkinAt("跑步", 120, null, false, LocalDate.of(2026, 11, 20)))
-                    .isInstanceOf(ApiException.class)
-                    .hasMessageContaining("累计");
-            verify(recordMapper, never()).insert(any(CheckinRecord.class));
+            assertThat(checkinAt("跑步", 200, null, false, LocalDate.of(2026, 11, 20)).record().getFlagged())
+                    .isZero();
+            assertThat(checkinAt("游泳", 120, null, false, LocalDate.of(2026, 11, 20)).record().getFlagged())
+                    .isZero();
         }
 
         @Test
-        @DisplayName("轨迹记录（verified）不受手动每日累计限制")
-        void verifiedRouteSkipsDailyLimit() {
+        @DisplayName("轨迹记录（verified）全额保存且不标记")
+        void verifiedRouteKeepsFullDuration() {
             when(userMapper.selectById(USER_ID)).thenReturn(user("male", "60", 0, null));
             when(recordMapper.insert(any(CheckinRecord.class))).thenReturn(1);
 
