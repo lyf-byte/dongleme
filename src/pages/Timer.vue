@@ -232,7 +232,7 @@ function finish() {
   const minutes = Math.min(600, Math.round(seconds / 60))
   submitted = true
   clearPersist()
-  router.replace({ path: '/checkin', query: { type: sport.value, duration: minutes } })
+  router.replace({ path: '/checkin', query: { type: sport.value, duration: minutes, source: 'timer' } })
 }
 
 function setMode(next) {

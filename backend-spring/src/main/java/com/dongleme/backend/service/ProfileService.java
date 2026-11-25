@@ -76,6 +76,7 @@ public class ProfileService {
         int todayMinutes = 0;
         int todayCalories = 0;
         int weekMinutes = 0;
+        double weekMinutesValue = 0;
         Set<LocalDate> weekDays = new LinkedHashSet<>();
         Set<String> todayTypes = new LinkedHashSet<>();
 
@@ -90,7 +91,7 @@ public class ProfileService {
                 continue;
             }
             if (!date.isBefore(weekStart)) {
-                weekMinutes += duration;
+                weekMinutesValue += effectiveMinutes(row);
                 weekDays.add(date);
             }
             if (today.equals(date)) {
@@ -111,6 +112,8 @@ public class ProfileService {
                 .filter(date -> date != null && !date.isBefore(weekStart))
                 .forEach(weekDays::add);
 
+        // 周时长与排行榜、好友、后台统一使用有效分钟口径
+        weekMinutes = (int) Math.round(weekMinutesValue);
         ProfileBasicView basic = ProfileBasicView.of(user);
         List<ProfileView.RecentRecord> recent = rows.stream()
                 .filter(row -> row.getId() != null)
@@ -136,6 +139,17 @@ public class ProfileService {
                 new ProfileView.Totals(rows.size(), totalMinutes, totalCalories),
                 recent
         );
+    }
+
+    private static double effectiveMinutes(CheckinRecord record) {
+        int duration = record.getDuration() == null ? 0 : record.getDuration();
+        if (record.getFlagged() != null && record.getFlagged() == 1) {
+            return 0;
+        }
+        if (record.getVerified() != null && record.getVerified() == 1) {
+            return duration;
+        }
+        return duration * 0.5;
     }
 
     public ExportView export(String userId) {

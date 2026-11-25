@@ -12,15 +12,13 @@ import java.util.List;
 
 public interface FollowMapper extends BaseMapper<Follow> {
 
-    @Select("""
-            select u.id, u.nickname, u.gender,
-                   (select coalesce(sum(r.duration), 0) from records r
-                      where r.user_id = u.id and r.date >= #{weekStart}) as weekly_minutes
-            from follows f
-            join users u on u.id = f.followee_id
-            where f.follower_id = #{userId}
-            order by f.created_at desc
-            """)
+    @Select("select u.id, u.nickname, u.gender, "
+            + "(select cast(coalesce(sum(" + RecordMetrics.EFFECTIVE_MINUTES + "), 0) as signed) from records r "
+            + "where r.user_id = u.id and r.date >= #{weekStart}) as weekly_minutes "
+            + "from follows f "
+            + "join users u on u.id = f.followee_id "
+            + "where f.follower_id = #{userId} "
+            + "order by f.created_at desc")
     List<FollowRow> selectFollowing(
             @Param("userId") String userId,
             @Param("weekStart") LocalDate weekStart);

@@ -14,24 +14,20 @@ import java.util.List;
 
 public interface UserMapper extends BaseMapper<User> {
 
-    @Select("""
-            select u.id, u.nickname, u.gender,
-                   cast(coalesce(sum(case when r.flagged = 1 then 0 when r.verified = 1 then r.duration else r.duration * 0.5 end), 0) as signed) as weekly_minutes
-            from users u
-            join records r on r.user_id = u.id and r.date >= #{weekStart}
-            group by u.id, u.nickname, u.gender
-            order by weekly_minutes desc, u.nickname asc
-            """)
+    @Select("select u.id, u.nickname, u.gender, "
+            + "cast(coalesce(sum(" + RecordMetrics.EFFECTIVE_MINUTES + "), 0) as signed) as weekly_minutes "
+            + "from users u "
+            + "join records r on r.user_id = u.id and r.date >= #{weekStart} "
+            + "group by u.id, u.nickname, u.gender "
+            + "order by weekly_minutes desc, u.nickname asc")
     List<RankRow> selectWeeklyRank(@Param("weekStart") LocalDate weekStart);
 
-    @Select("""
-            select u.id, u.nickname, u.gender,
-                   cast(coalesce(sum(case when r.flagged = 1 then 0 when r.verified = 1 then r.duration else r.duration * 0.5 end), 0) as signed) as weekly_minutes
-            from users u
-            join records r on r.user_id = u.id
-            group by u.id, u.nickname, u.gender
-            order by weekly_minutes desc, u.nickname asc
-            """)
+    @Select("select u.id, u.nickname, u.gender, "
+            + "cast(coalesce(sum(" + RecordMetrics.EFFECTIVE_MINUTES + "), 0) as signed) as weekly_minutes "
+            + "from users u "
+            + "join records r on r.user_id = u.id "
+            + "group by u.id, u.nickname, u.gender "
+            + "order by weekly_minutes desc, u.nickname asc")
     List<RankRow> selectTotalRank();
 
     @Select("""
@@ -53,7 +49,7 @@ public interface UserMapper extends BaseMapper<User> {
             select u.id, u.nickname, u.gender, u.weight, u.weekly_goal, u.streak,
                    u.last_check_date, u.is_admin as admin, u.created_at, u.email, u.phone, u.username,
                    count(r.id) as record_count,
-                   coalesce(sum(case when r.date &gt;= #{weekStart} then r.duration else 0 end), 0) as week_minutes,
+                   cast(coalesce(sum(case when r.date &gt;= #{weekStart} then case when r.flagged = 1 then 0 when r.verified = 1 then r.duration else r.duration * 0.5 end else 0 end), 0) as signed) as week_minutes,
                    (select count(*) from activity_routes ar where ar.user_id = u.id) as route_count,
                    count(*) over() as total
             from users u

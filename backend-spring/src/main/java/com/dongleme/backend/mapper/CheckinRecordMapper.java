@@ -36,9 +36,9 @@ public interface CheckinRecordMapper extends BaseMapper<CheckinRecord> {
             """)
     long countByDate(@Param("date") LocalDate date);
 
-    @Select("""
-            select coalesce(sum(duration), 0) from records where date >= #{weekStart}
-            """)
+    @Select("select cast(coalesce(sum("
+            + RecordMetrics.EFFECTIVE_MINUTES
+            + "), 0) as signed) from records r where r.date >= #{weekStart}")
     long sumMinutesSince(@Param("weekStart") LocalDate weekStart);
 
     @Select("""
@@ -50,12 +50,9 @@ public interface CheckinRecordMapper extends BaseMapper<CheckinRecord> {
             """)
     List<AdminTrendRow> selectTrend(@Param("from") LocalDate from);
 
-    @Select("""
-            select type as name, count(*) as count, coalesce(sum(duration), 0) as minutes
-            from records
-            group by type
-            order by count desc, minutes desc
-            """)
+    @Select("select r.type as name, count(*) as count, "
+            + "cast(coalesce(sum(" + RecordMetrics.EFFECTIVE_MINUTES + "), 0) as signed) as minutes "
+            + "from records r group by r.type order by count(*) desc, minutes desc")
     List<AdminTypeStatRow> selectTypeStats();
 
     @Select("""

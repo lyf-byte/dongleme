@@ -32,6 +32,7 @@ const routeDuration = Number(route.query.duration)
 const initialDuration = Number.isInteger(routeDuration) && routeDuration >= 1 && routeDuration <= 600
   ? routeDuration
   : 30
+const checkinSource = route.query.source === 'timer' ? 'timer' : 'manual'
 
 const form = ref({
   type: initialSport ? initialSport.name : '跑步',
@@ -117,7 +118,8 @@ async function submit(overwrite = false) {
       type: form.value.type,
       duration,
       weight,
-      overwrite
+      overwrite,
+      source: checkinSource
     })
     todayTypes.value = Array.from(new Set([...todayTypes.value, form.value.type]))
     success.value = {

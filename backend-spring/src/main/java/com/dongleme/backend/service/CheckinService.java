@@ -54,6 +54,7 @@ public class CheckinService {
         }
         int duration = durationValue.intValue();
 
+        String source = "timer".equalsIgnoreCase(request.source()) ? "timer" : "manual";
         CheckinOutcome outcome = checkinAt(
                 userId,
                 request.type(),
@@ -61,7 +62,7 @@ public class CheckinService {
                 request.weight(),
                 Boolean.TRUE.equals(request.overwrite()),
                 ShanghaiTime.today(),
-                "manual",
+                source,
                 false);
         CheckinRecord record = outcome.record();
         return new CheckinResult(
