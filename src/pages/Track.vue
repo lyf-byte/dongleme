@@ -7,6 +7,7 @@ import {
   Check,
   ChevronRight,
   History,
+  Lock,
   Music,
   Navigation,
   Pause,
@@ -212,7 +213,10 @@ async function startRun() {
 
 function handleCountdownDone() {
   countdownActive.value = false
-  if (!start(selectedSport.value)) {
+  if (start(selectedSport.value)) {
+    locked.value = false
+    pageIndex.value = 0
+  } else {
     toast('当前已有记录在进行')
   }
 }
@@ -226,6 +230,73 @@ function onMusicPicked(value) {
   musicSource.value = value
   if (value) openMusicApp(value)
 }
+
+/* ---- 防误触锁：锁定后操作区只剩「长按解锁」，避免手机在兜里误触 ---- */
+const locked = ref(false)
+const holdProgress = ref(0)
+const HOLD_MS = 900
+let holdRaf = 0
+let holdStart = 0
+
+function lockScreen() {
+  if (locked.value) return
+  locked.value = true
+  holdProgress.value = 0
+}
+
+function startHold() {
+  if (holdRaf) return
+  holdStart = 0
+  const step = (ts) => {
+    if (!holdStart) holdStart = ts
+    const progress = Math.min(1, (ts - holdStart) / HOLD_MS)
+    holdProgress.value = progress
+    if (progress >= 1) {
+      unlockScreen()
+      return
+    }
+    holdRaf = requestAnimationFrame(step)
+  }
+  holdRaf = requestAnimationFrame(step)
+}
+
+function stopHold() {
+  if (holdRaf) {
+    cancelAnimationFrame(holdRaf)
+    holdRaf = 0
+  }
+  holdStart = 0
+  holdProgress.value = 0
+}
+
+function unlockScreen() {
+  stopHold()
+  locked.value = false
+  if ('vibrate' in navigator) {
+    try {
+      navigator.vibrate(50)
+    } catch {
+      /* 不支持就算了 */
+    }
+  }
+}
+
+/* ---- 数据面板分页：实时 / 本周累计 ---- */
+const pagesRef = ref(null)
+const pageIndex = ref(0)
+
+function onPagesScroll() {
+  const el = pagesRef.value
+  if (!el || !el.clientWidth) return
+  pageIndex.value = Math.min(1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth)))
+}
+
+const weekMinutes = computed(() => profile.value?.weekMinutes || 0)
+const todayMinutes = computed(() => profile.value?.today?.minutes || 0)
+const weekGoalPercent = computed(() => {
+  const goal = profile.value?.weeklyGoal || 150
+  return goal > 0 ? Math.round((weekMinutes.value / goal) * 100) : 0
+})
 
 async function askFinish() {
   try {
@@ -309,7 +380,12 @@ function openRoute(id) {
 }
 
 function resumeDraftRun() {
-  if (!resumeDraft()) toast('草稿无法恢复')
+  if (resumeDraft()) {
+    locked.value = false
+    pageIndex.value = 0
+  } else {
+    toast('草稿无法恢复')
+  }
 }
 
 function discardDraftRun() {
@@ -372,7 +448,7 @@ onBeforeRouteLeave(async (to, from, next) => {
           v-if="!mapMissing"
           type="button"
           class="track-refresh track-refresh--live"
-          :disabled="refreshing"
+          :disabled="refreshing || locked"
           @click="refreshLocation"
         >
           <Navigation :size="14" />
@@ -380,7 +456,13 @@ onBeforeRouteLeave(async (to, from, next) => {
         </button>
 
         <div class="track-live__top">
-          <button type="button" class="track-round" aria-label="返回" @click="router.back()">
+          <button
+            type="button"
+            class="track-round"
+            :disabled="locked"
+            aria-label="返回"
+            @click="router.back()"
+          >
             <ArrowLeft :size="19" />
           </button>
           <div class="track-live__title">
@@ -390,7 +472,7 @@ onBeforeRouteLeave(async (to, from, next) => {
           <span class="gps-chip" :class="'gps-chip--' + gpsChipState">{{ gpsText }}</span>
         </div>
 
-        <div class="track-live__bottom">
+        <div class="track-live__bottom" :class="{ 'is-locked': locked }">
           <button type="button" class="live-music" @click="onMusicTap">
             <span class="live-music__icon"><Music :size="16" /></span>
             <span class="live-music__text">
@@ -404,36 +486,86 @@ onBeforeRouteLeave(async (to, from, next) => {
             <strong>{{ distanceView.value }}</strong>
             <span>{{ distanceView.unit }}</span>
           </div>
-          <div class="track-metrics">
-            <div>
-              <span>时长</span>
-              <strong>{{ formatDuration(duration) }}</strong>
+
+          <div ref="pagesRef" class="track-pages" @scroll.passive="onPagesScroll">
+            <div class="track-metrics">
+              <div>
+                <span>时长</span>
+                <strong>{{ formatDuration(duration) }}</strong>
+              </div>
+              <div>
+                <span>{{ paceLabel }}</span>
+                <strong>{{ paceValue }}</strong>
+              </div>
+              <div>
+                <span>热量</span>
+                <strong>{{ estimatedCalories }}<small>千卡</small></strong>
+              </div>
             </div>
-            <div>
-              <span>{{ paceLabel }}</span>
-              <strong>{{ paceValue }}</strong>
+            <div class="track-metrics">
+              <div>
+                <span>本周时长</span>
+                <strong>{{ weekMinutes }}<small>分钟</small></strong>
+              </div>
+              <div>
+                <span>今日时长</span>
+                <strong>{{ todayMinutes }}<small>分钟</small></strong>
+              </div>
+              <div>
+                <span>周目标</span>
+                <strong>{{ weekGoalPercent }}<small>%</small></strong>
+              </div>
             </div>
-            <div>
-              <span>热量</span>
-              <strong>{{ estimatedCalories }}<small>千卡</small></strong>
-            </div>
+          </div>
+
+          <div class="track-dots" aria-hidden="true">
+            <i :class="{ on: pageIndex === 0 }"></i>
+            <i :class="{ on: pageIndex === 1 }"></i>
           </div>
 
           <p v-if="trackerError" class="track-error">{{ trackerError }}</p>
           <p v-if="pointLimitReached" class="track-tip track-tip--dark">轨迹点已达上限，后续点位不再记录。</p>
 
-          <div class="track-actions">
+          <button
+            v-if="locked"
+            type="button"
+            class="unlock-btn"
+            :style="{ '--p': holdProgress }"
+            @pointerdown.prevent="startHold"
+            @pointerup="stopHold"
+            @pointerleave="stopHold"
+            @pointercancel="stopHold"
+          >
+            <i class="unlock-fill"></i>
+            <span class="unlock-label"><Lock :size="15" />长按解锁</span>
+          </button>
+
+          <div v-else class="track-actions">
             <button
               type="button"
-              class="track-pause"
+              class="act-lock"
+              aria-label="锁定屏幕，防止误触"
+              @click="lockScreen"
+            >
+              <Lock :size="15" />
+            </button>
+            <button
+              type="button"
+              class="act-main"
+              :class="{ 'is-resume': status === 'paused' }"
+              :aria-label="status === 'paused' ? '继续记录' : '暂停记录'"
               @click="status === 'paused' ? resume() : pause()"
             >
-              <component :is="status === 'paused' ? Play : Pause" :size="18" />
-              {{ status === 'paused' ? '继续' : '暂停' }}
+              <component :is="status === 'paused' ? Play : Pause" :size="26" />
             </button>
-            <button type="button" class="track-finish" @click="askFinish">
-              <Square :size="16" />
-              结束
+            <button
+              type="button"
+              class="act-stop"
+              :class="{ 'is-danger': status === 'paused' }"
+              aria-label="结束记录"
+              @click="askFinish"
+            >
+              <Square :size="18" />
             </button>
           </div>
         </div>
@@ -911,36 +1043,154 @@ onBeforeRouteLeave(async (to, from, next) => {
   font-weight: 500;
 }
 
-.track-actions {
-  display: grid;
-  grid-template-columns: 1fr 1.4fr;
-  gap: 10px;
-  margin-top: 16px;
+/* 数据分页：实时 / 本周累计，横向 scroll-snap 切换 */
+.track-pages {
+  display: flex;
+  margin-top: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 
-.track-pause,
-.track-finish {
+.track-pages::-webkit-scrollbar {
+  display: none;
+}
+
+.track-pages .track-metrics {
+  flex: 0 0 100%;
+  margin-top: 0;
+  scroll-snap-align: start;
+}
+
+.track-dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 9px;
+}
+
+.track-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.26);
+  transition: width 0.2s ease, background 0.2s ease;
+}
+
+.track-dots i.on {
+  width: 14px;
+  background: #fff;
+}
+
+/* 圆形控制区：锁定 / 暂停-继续 / 结束 */
+.track-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 7px;
-  height: 52px;
-  border-radius: 16px;
-  font-size: 15px;
-  font-weight: 600;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 0 6px;
 }
 
-.track-pause {
-  border: 1px solid rgba(255, 255, 255, 0.22);
+.act-lock,
+.act-stop,
+.act-main {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.12s ease;
+}
+
+.act-lock:active,
+.act-stop:active,
+.act-main:active {
+  transform: scale(0.94);
+}
+
+.act-lock {
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.act-main {
+  width: 70px;
+  height: 70px;
+  border: 0;
+  background: linear-gradient(135deg, #2f6bff, #5b8cff);
+  color: #fff;
+  box-shadow: 0 12px 26px rgba(47, 107, 255, 0.36);
+}
+
+.act-main.is-resume {
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  box-shadow: 0 12px 26px rgba(22, 163, 74, 0.36);
+}
+
+.act-stop {
+  width: 56px;
+  height: 56px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }
 
-.track-finish {
-  border: 0;
-  background: linear-gradient(135deg, #2f6bff, #5b8cff);
+.act-stop.is-danger {
+  border-color: transparent;
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  box-shadow: 0 10px 22px rgba(220, 38, 38, 0.36);
+}
+
+/* 锁定态：数据变暗、操作禁用，只留长按解锁条 */
+.track-live__bottom.is-locked .live-music,
+.track-live__bottom.is-locked .track-distance,
+.track-live__bottom.is-locked .track-pages,
+.track-live__bottom.is-locked .track-dots {
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.unlock-btn {
+  position: relative;
+  width: 100%;
+  height: 52px;
+  margin-top: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
-  box-shadow: 0 12px 24px rgba(47, 107, 255, 0.28);
+  overflow: hidden;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.unlock-fill {
+  position: absolute;
+  inset: 0;
+  width: calc(var(--p, 0) * 100%);
+  background: rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+}
+
+.unlock-label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.track-round:disabled {
+  opacity: 0.45;
 }
 
 .track-error {
