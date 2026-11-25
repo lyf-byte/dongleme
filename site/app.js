@@ -73,7 +73,7 @@
       apkLabel.textContent = 'Android 版准备中'
       apk.classList.add('is-pending')
       apk.removeAttribute('download')
-      apk.setAttribute('href', 'https://dongleme.xyz')
+      apk.setAttribute('href', 'https://app.dongleme.xyz')
       apk.setAttribute('aria-label', 'Android 版准备中，前往网页版体验')
     }
 

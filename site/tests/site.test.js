@@ -124,7 +124,7 @@ test('APK 不存在时降级为网页版入口', async () => {
   const app = loadApp({ fetchImpl: () => Promise.resolve({ ok: false }) })
   await flushPromises()
   assert.equal(app.apkLabel.textContent, 'Android 版准备中')
-  assert.equal(app.apk.getAttribute('href'), 'https://dongleme.xyz')
+  assert.equal(app.apk.getAttribute('href'), 'https://app.dongleme.xyz')
   assert.equal(app.apk.getAttribute('download'), null)
   assert.ok(app.apk.classList.contains('is-pending'))
 })
@@ -132,7 +132,7 @@ test('APK 不存在时降级为网页版入口', async () => {
 test('HTTP 网络异常时不会保留死链', async () => {
   const app = loadApp({ fetchImpl: () => Promise.reject(new Error('offline')) })
   await flushPromises()
-  assert.equal(app.apk.getAttribute('href'), 'https://dongleme.xyz')
+  assert.equal(app.apk.getAttribute('href'), 'https://app.dongleme.xyz')
   assert.equal(app.apkLabel.textContent, 'Android 版准备中')
 })
 

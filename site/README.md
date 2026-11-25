@@ -52,7 +52,7 @@ scp dongleme.apk ubuntu@<服务器>:/opt/donglemei/site/download/
 
 ## 需要改的地方
 
-应用域名写在 `index.html` 里（导航 CTA、首屏「在线体验」、下载区的网页版按钮和页脚入口）。换域名时在 `index.html` 与 `app.js` 中全局替换 `https://dongleme.xyz`；`app.js` 中的地址用于 APK 缺失或网络异常时跳转网页版。
+应用域名写在 `index.html` 里（导航 CTA、首屏「在线体验」、下载区的网页版按钮和页脚入口）。换域名时在 `index.html` 与 `app.js` 中全局替换 `https://app.dongleme.xyz`；`app.js` 中的地址用于 APK 缺失或网络异常时跳转网页版。
 
 `privacy.html` 和 `terms.html` 是独立静态页面，部署 `site/` 时会一起上传。修改条款后，请同步核对应用内 `Auth.vue` 与 `Settings.vue` 的隐私说明，避免文案和实际数据处理不一致。
 
@@ -61,11 +61,13 @@ scp dongleme.apk ubuntu@<服务器>:/opt/donglemei/site/download/
 当前线上布局：
 
 ```
-www.dongleme.xyz  ->  官网（/opt/donglemei/site）
-dongleme.xyz      ->  App（/opt/donglemei/dist）
+dongleme.xyz / www.dongleme.xyz  ->  官网（/opt/donglemei/site）
+app.dongleme.xyz                 ->  App（/opt/donglemei/dist）
 ```
 
-Caddy 里是两个独立的站点块，App 那一块保留原来的 `/api/*` 反代和 CSP，官网这一块只管静态文件。
+`app.dongleme.xyz` 需要在阿里云 DNS 添加 A 记录指向 `3.105.101.123`，Caddy 会自动签发证书。
+
+Caddy 里是两个站点块：官网（主域名 + www）和 App（`app` 子域名 + `nip.io` 备用）；两个站点都保留 `/api/*` 反代，安卓客户端继续使用主域名的接口。
 
 更新官网：
 
