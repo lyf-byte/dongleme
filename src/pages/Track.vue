@@ -218,11 +218,8 @@ function handleCountdownDone() {
 }
 
 function onMusicTap() {
-  if (!musicSource.value) {
-    musicOpen.value = true
-    return
-  }
-  openMusicApp(musicSource.value)
+  // 已选音源时也先打开选择面板，方便随时更换；选中后才会唤起对应音乐 App
+  musicOpen.value = true
 }
 
 function onMusicPicked(value) {
