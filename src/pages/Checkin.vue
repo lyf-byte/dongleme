@@ -27,10 +27,12 @@ const allSports = computed(() => mergeSports(customSports.value))
 const routeType = typeof route.query.type === 'string' ? route.query.type : ''
 const initialSport = allSports.value.find((sport) => sport.name === routeType)
 
+// 单次手动/计时器打卡上限（分钟），与后端一致；更长时间走轨迹记录
+const MAX_MANUAL_MINUTES = 240
 // 运动计时器跳过来时会带上 duration（分钟），这里直接回填
 const routeDuration = Number(route.query.duration)
-const initialDuration = Number.isInteger(routeDuration) && routeDuration >= 1 && routeDuration <= 600
-  ? routeDuration
+const initialDuration = Number.isInteger(routeDuration) && routeDuration >= 1
+  ? Math.min(MAX_MANUAL_MINUTES, routeDuration)
   : 30
 const checkinSource = route.query.source === 'timer' ? 'timer' : 'manual'
 
@@ -65,7 +67,7 @@ const calories = computed(() =>
 
 function adjust(delta) {
   const next = Number(form.value.duration) + delta
-  form.value.duration = Math.min(600, Math.max(1, Number.isFinite(next) ? next : 1))
+  form.value.duration = Math.min(MAX_MANUAL_MINUTES, Math.max(1, Number.isFinite(next) ? next : 1))
 }
 
 async function loadProfile() {
@@ -103,8 +105,8 @@ async function submit(overwrite = false) {
   const duration = Number(form.value.duration)
   const weight = Number(form.value.weight)
 
-  if (!Number.isInteger(duration) || duration < 1 || duration > 600) {
-    toast('时长需为 1–600 的整数')
+  if (!Number.isInteger(duration) || duration < 1 || duration > MAX_MANUAL_MINUTES) {
+    toast(`单次时长需为 1–${MAX_MANUAL_MINUTES} 的整数分钟，更长时间请使用轨迹记录`)
     return
   }
   if (!Number.isFinite(weight) || weight < 20 || weight > 300) {

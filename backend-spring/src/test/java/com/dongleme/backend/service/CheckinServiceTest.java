@@ -81,9 +81,9 @@ class CheckinServiceTest {
         }
 
         @Test
-        @DisplayName("超过 600 分钟被拒绝")
+        @DisplayName("超过 240 分钟被拒绝")
         void rejectsTooLongDuration() {
-            assertThatThrownBy(() -> service.checkin(USER_ID, new CheckinRequest("跑步", 601.0, null, false)))
+            assertThatThrownBy(() -> service.checkin(USER_ID, new CheckinRequest("跑步", 241.0, null, false)))
                     .isInstanceOf(ApiException.class)
                     .hasMessageContaining("时长");
         }
@@ -107,15 +107,44 @@ class CheckinServiceTest {
         }
 
         @Test
-        @DisplayName("边界值 1 与 600 均可通过")
+        @DisplayName("边界值 1 与 240 均可通过")
         void acceptsBoundaryDurations() {
             when(userMapper.selectById(USER_ID)).thenReturn(user("male", "60", 0, null));
             when(recordMapper.insert(any(CheckinRecord.class))).thenReturn(1);
 
             assertThat(service.checkin(USER_ID, new CheckinRequest("跑步", 1.0, null, false)).duration())
                     .isEqualTo(1);
-            assertThat(service.checkin(USER_ID, new CheckinRequest("跑步", 600.0, null, false)).duration())
-                    .isEqualTo(600);
+            assertThat(service.checkin(USER_ID, new CheckinRequest("跑步", 240.0, null, false)).duration())
+                    .isEqualTo(240);
+        }
+
+        @Test
+        @DisplayName("每日手动累计超过 300 分钟被拒绝")
+        void rejectsDailyAccumulation() {
+            when(userMapper.selectById(USER_ID)).thenReturn(user("male", "60", 0, null));
+            CheckinRecord existing = new CheckinRecord();
+            existing.setType("游泳");
+            existing.setDuration(200);
+            existing.setVerified(0);
+            when(recordMapper.selectList(any())).thenReturn(java.util.List.of(existing));
+
+            assertThatThrownBy(() -> checkinAt("跑步", 120, null, false, LocalDate.of(2026, 11, 20)))
+                    .isInstanceOf(ApiException.class)
+                    .hasMessageContaining("累计");
+            verify(recordMapper, never()).insert(any(CheckinRecord.class));
+        }
+
+        @Test
+        @DisplayName("轨迹记录（verified）不受手动每日累计限制")
+        void verifiedRouteSkipsDailyLimit() {
+            when(userMapper.selectById(USER_ID)).thenReturn(user("male", "60", 0, null));
+            when(recordMapper.insert(any(CheckinRecord.class))).thenReturn(1);
+
+            CheckinService.CheckinOutcome outcome = service.checkinAt(
+                    USER_ID, "骑行", 360, null, false, LocalDate.of(2026, 11, 20), "route", true);
+
+            assertThat(outcome.record().getDuration()).isEqualTo(360);
+            assertThat(outcome.record().getFlagged()).isZero();
         }
     }
 

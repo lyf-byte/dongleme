@@ -11,6 +11,8 @@ const COUNTDOWN_PRESETS = [3, 5, 10, 15, 20, 30]
 const RING_RADIUS = 136
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS
 const RESTORE_TTL_MS = 12 * 60 * 60 * 1000
+// 单次手动/计时器打卡上限（分钟），与后端一致；更长时间走轨迹记录
+const MAX_MANUAL_MINUTES = 240
 
 const route = useRoute()
 const router = useRouter()
@@ -229,7 +231,11 @@ function finish() {
     return
   }
 
-  const minutes = Math.min(600, Math.round(seconds / 60))
+  const rawMinutes = Math.round(seconds / 60)
+  const minutes = Math.min(MAX_MANUAL_MINUTES, rawMinutes)
+  if (rawMinutes > MAX_MANUAL_MINUTES) {
+    toast(`计时超过 ${MAX_MANUAL_MINUTES} 分钟，按上限记录，更长时间请使用轨迹记录`)
+  }
   submitted = true
   clearPersist()
   router.replace({ path: '/checkin', query: { type: sport.value, duration: minutes, source: 'timer' } })

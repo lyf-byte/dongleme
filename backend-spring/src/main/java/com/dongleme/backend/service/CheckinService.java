@@ -24,7 +24,12 @@ import java.time.temporal.ChronoUnit;
 @Service
 public class CheckinService {
 
-    private static final int MANUAL_DAILY_LIMIT = 180;
+    /** 单次手动/计时器打卡时长上限（分钟） */
+    private static final int MANUAL_SESSION_MAX = 240;
+    /** 每日手动/计时器打卡累计上限（分钟），GPS 轨迹不受此限 */
+    private static final int MANUAL_DAILY_MAX = 300;
+    /** 每日手动累计超过该值标记为待审核（分钟） */
+    private static final int MANUAL_FLAG_LIMIT = 180;
 
     private final UserMapper userMapper;
     private final CheckinRecordMapper recordMapper;
@@ -49,8 +54,9 @@ public class CheckinService {
                 || !Double.isFinite(durationValue)
                 || durationValue != Math.rint(durationValue)
                 || durationValue < 1
-                || durationValue > 600) {
-            throw ApiException.badRequest("时长必须是 1–600 的整数");
+                || durationValue > MANUAL_SESSION_MAX) {
+            throw ApiException.badRequest(
+                    "单次时长需为 1–" + MANUAL_SESSION_MAX + " 的整数分钟，更长时间请使用轨迹记录");
         }
         int duration = durationValue.intValue();
 
@@ -136,7 +142,12 @@ public class CheckinService {
                     .stream()
                     .mapToInt(r -> r.getDuration() == null ? 0 : r.getDuration())
                     .sum();
-            if (otherManual + duration > MANUAL_DAILY_LIMIT) {
+            if (otherManual + duration > MANUAL_DAILY_MAX) {
+                throw ApiException.badRequest(
+                        "今日手动打卡累计不能超过 " + MANUAL_DAILY_MAX
+                                + " 分钟，长时间运动请使用轨迹记录");
+            }
+            if (otherManual + duration > MANUAL_FLAG_LIMIT) {
                 flagged = 1;
             }
         }
