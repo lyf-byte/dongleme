@@ -24,7 +24,7 @@ public interface FollowMapper extends BaseMapper<Follow> {
             @Param("weekStart") LocalDate weekStart);
 
     @Select("""
-            select r.id, r.user_id, u.nickname, u.gender, r.date, r.type, r.duration, r.calories
+            select r.id, r.user_id, u.nickname, u.gender, r.date, r.type, r.duration, r.calories, r.flagged
             from follows f
             join records r on r.user_id = f.followee_id
             join users u on u.id = r.user_id

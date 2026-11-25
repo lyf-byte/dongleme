@@ -56,14 +56,21 @@ public class StatsService {
         for (CheckinRecord row : rows) {
             int duration = row.getDuration() == null ? 0 : row.getDuration();
             int calories = row.getCalories() == null ? 0 : row.getCalories();
-            minutesTotal += duration;
-            caloriesTotal += calories;
-            typeMap.merge(row.getType(), duration, Integer::sum);
+            boolean flagged = row.getFlagged() != null && row.getFlagged() == 1;
+            int effectiveDuration = flagged ? 0 : duration;
+            int effectiveCalories = flagged ? 0 : calories;
+            minutesTotal += effectiveDuration;
+            caloriesTotal += effectiveCalories;
+            if (effectiveDuration > 0) {
+                typeMap.merge(row.getType(), effectiveDuration, Integer::sum);
+            }
 
             DayAggregate day = dayMap.computeIfAbsent(row.getDate(), key -> new DayAggregate());
-            day.minutes += duration;
-            day.calories += calories;
-            day.types.merge(row.getType(), duration, Integer::sum);
+            day.minutes += effectiveDuration;
+            day.calories += effectiveCalories;
+            if (effectiveDuration > 0) {
+                day.types.merge(row.getType(), effectiveDuration, Integer::sum);
+            }
         }
 
         List<StatsDaily> daily = new ArrayList<>();

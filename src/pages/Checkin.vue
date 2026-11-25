@@ -129,7 +129,8 @@ async function submit(overwrite = false) {
       duration,
       calories: result.calories,
       streak: result.streak,
-      date: result.date
+      date: result.date,
+      flagged: result.flagged === 1
     }
     preparePoster(success.value)
   } catch (error) {
@@ -212,6 +213,7 @@ async function buildPoster(data) {
   ctx.fillStyle = '#ffffff'
   ctx.font = `bold 42px ${POSTER_FONT}`
   const title = `${posterDateText(data.date)} · ${data.type || '运动'}`
+    + (data.flagged ? ' · 审核中' : '')
   ctx.fillText(clipText(ctx, title, 440), 64, bandTop + 120)
 
   drawStatColumns(ctx, [
@@ -380,7 +382,10 @@ onMounted(() => {
             <span class="success-check"><Check :size="18" /></span>
             <div>
               <h2>打卡成功</h2>
-              <p>{{ success.type }} · {{ success.duration }} 分钟 · {{ success.calories }} 千卡</p>
+              <p>
+                {{ success.type }} · {{ success.duration }} 分钟 · {{ success.calories }} 千卡
+                <template v-if="success.flagged"> · 审核中</template>
+              </p>
             </div>
           </div>
 

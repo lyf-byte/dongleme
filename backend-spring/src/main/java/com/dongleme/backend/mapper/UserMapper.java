@@ -49,7 +49,7 @@ public interface UserMapper extends BaseMapper<User> {
             select u.id, u.nickname, u.gender, u.weight, u.weekly_goal, u.streak,
                    u.last_check_date, u.is_admin as admin, u.created_at, u.email, u.phone, u.username,
                    count(r.id) as record_count,
-                   cast(coalesce(sum(case when r.date &gt;= #{weekStart} then case when r.flagged = 1 then 0 when r.verified = 1 then r.duration else r.duration * 0.5 end else 0 end), 0) as signed) as week_minutes,
+                   cast(coalesce(sum(case when r.date &gt;= #{weekStart} then case when r.flagged = 1 then 0 else r.duration end else 0 end), 0) as signed) as week_minutes,
                    (select count(*) from activity_routes ar where ar.user_id = u.id) as route_count,
                    count(*) over() as total
             from users u

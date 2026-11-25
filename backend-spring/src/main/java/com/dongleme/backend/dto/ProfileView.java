@@ -21,12 +21,18 @@ public record ProfileView(
         List<RecentRecord> recent
 ) {
 
-    public record Today(int minutes, int calories, List<String> types) {
+    public record Today(
+            int minutes,
+            int calories,
+            int pendingMinutes,
+            int pendingCalories,
+            List<String> types) {
     }
 
     public record Totals(int count, int minutes, int calories) {
     }
 
-    public record RecentRecord(LocalDate date, String type, int duration, int calories) {
+    public record RecentRecord(
+            LocalDate date, String type, int duration, int calories, int flagged) {
     }
 }

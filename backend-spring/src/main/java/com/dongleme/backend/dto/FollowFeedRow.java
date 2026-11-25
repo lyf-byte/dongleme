@@ -22,4 +22,6 @@ public class FollowFeedRow {
     private Integer duration;
 
     private Integer calories;
+
+    private Integer flagged;
 }

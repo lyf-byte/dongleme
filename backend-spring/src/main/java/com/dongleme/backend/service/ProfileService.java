@@ -75,6 +75,8 @@ public class ProfileService {
         int totalCalories = 0;
         int todayMinutes = 0;
         int todayCalories = 0;
+        int todayPendingMinutes = 0;
+        int todayPendingCalories = 0;
         int weekMinutes = 0;
         double weekMinutesValue = 0;
         Set<LocalDate> weekDays = new LinkedHashSet<>();
@@ -83,8 +85,11 @@ public class ProfileService {
         for (CheckinRecord row : rows) {
             int duration = row.getDuration() == null ? 0 : row.getDuration();
             int calories = row.getCalories() == null ? 0 : row.getCalories();
-            totalMinutes += duration;
-            totalCalories += calories;
+            boolean flagged = row.getFlagged() != null && row.getFlagged() == 1;
+            int effectiveDuration = flagged ? 0 : duration;
+            int effectiveCalories = flagged ? 0 : calories;
+            totalMinutes += effectiveDuration;
+            totalCalories += effectiveCalories;
 
             LocalDate date = row.getDate();
             if (date == null) {
@@ -95,8 +100,12 @@ public class ProfileService {
                 weekDays.add(date);
             }
             if (today.equals(date)) {
-                todayMinutes += duration;
-                todayCalories += calories;
+                todayMinutes += effectiveDuration;
+                todayCalories += effectiveCalories;
+                if (flagged) {
+                    todayPendingMinutes += duration;
+                    todayPendingCalories += calories;
+                }
                 if (row.getType() != null) {
                     todayTypes.add(row.getType());
                 }
@@ -123,7 +132,8 @@ public class ProfileService {
                         row.getDate(),
                         row.getType(),
                         row.getDuration() == null ? 0 : row.getDuration(),
-                        row.getCalories() == null ? 0 : row.getCalories()))
+                        row.getCalories() == null ? 0 : row.getCalories(),
+                        row.getFlagged() == null ? 0 : row.getFlagged()))
                 .toList();
         return new ProfileView(
                 basic.nickname(),
@@ -135,7 +145,12 @@ public class ProfileService {
                 basic.createdAt(),
                 weekMinutes,
                 List.copyOf(weekDays),
-                new ProfileView.Today(todayMinutes, todayCalories, List.copyOf(todayTypes)),
+                new ProfileView.Today(
+                        todayMinutes,
+                        todayCalories,
+                        todayPendingMinutes,
+                        todayPendingCalories,
+                        List.copyOf(todayTypes)),
                 new ProfileView.Totals(rows.size(), totalMinutes, totalCalories),
                 recent
         );
@@ -146,10 +161,7 @@ public class ProfileService {
         if (record.getFlagged() != null && record.getFlagged() == 1) {
             return 0;
         }
-        if (record.getVerified() != null && record.getVerified() == 1) {
-            return duration;
-        }
-        return duration * 0.5;
+        return duration;
     }
 
     public ExportView export(String userId) {

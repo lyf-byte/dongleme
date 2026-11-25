@@ -202,10 +202,14 @@ public class SummaryService {
         WeekStats stats = new WeekStats();
         for (CheckinRecord row : rows) {
             int duration = row.getDuration() == null ? 0 : row.getDuration();
+            boolean flagged = row.getFlagged() != null && row.getFlagged() == 1;
+            int effectiveDuration = flagged ? 0 : duration;
             stats.count += 1;
-            stats.minutes += duration;
-            stats.calories += row.getCalories() == null ? 0 : row.getCalories();
-            stats.types.merge(row.getType(), duration, Integer::sum);
+            stats.minutes += effectiveDuration;
+            stats.calories += flagged || row.getCalories() == null ? 0 : row.getCalories();
+            if (effectiveDuration > 0) {
+                stats.types.merge(row.getType(), effectiveDuration, Integer::sum);
+            }
         }
         return stats;
     }

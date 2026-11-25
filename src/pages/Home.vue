@@ -98,7 +98,7 @@ const reminderText = computed(() => {
 const avatarText = computed(() => (profile.value?.nickname || '动').slice(0, 1))
 const avatarSrc = computed(() => avatarFor(profile.value?.gender))
 const today = computed(
-  () => profile.value?.today || { minutes: 0, calories: 0, types: [] }
+  () => profile.value?.today || { minutes: 0, calories: 0, pendingMinutes: 0, pendingCalories: 0, types: [] }
 )
 const weekMinutes = computed(() => profile.value?.weekMinutes || 0)
 const weeklyGoal = computed(() => profile.value?.weeklyGoal || 150)
@@ -118,7 +118,8 @@ const recentRows = computed(() => recentRecords.value.map((item) => ({
   icon: recordIcon(item.type),
   dateText: formatRecordDate(item.date),
   duration: item.duration,
-  calories: item.calories
+  calories: item.calories,
+  flagged: item.flagged === 1
 })))
 
 function recordIcon(type) {
@@ -313,6 +314,9 @@ onUnmounted(() => {
           <span class="today-icon today-icon--blue"><Clock3 :size="17" /></span>
           <p>今日运动</p>
           <strong>{{ today.minutes }}<span>分钟</span></strong>
+          <small v-if="today.pendingMinutes" class="today-pending">
+            另有 {{ today.pendingMinutes }} 分钟待审核
+          </small>
         </div>
         <div class="card today-card">
           <span class="today-icon today-icon--orange"><Flame :size="17" /></span>
@@ -812,6 +816,14 @@ onUnmounted(() => {
   margin-left: 3px;
   font-size: 11px;
   font-weight: 400;
+  color: var(--muted);
+}
+
+.today-pending {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 14px;
   color: var(--muted);
 }
 

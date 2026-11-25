@@ -21,7 +21,7 @@ public interface AdminStatsMapper {
               (select count(*) from records) as total_records,
               (select count(distinct user_id) from records where date = #{today}) as active_today,
               (select count(*) from records where date = #{today}) as today_records,
-              (select cast(coalesce(sum(case when r.flagged = 1 then 0 when r.verified = 1 then r.duration else r.duration * 0.5 end), 0) as signed) from records r where r.date >= #{weekStart}) as week_minutes,
+              (select cast(coalesce(sum(case when r.flagged = 1 then 0 else r.duration end), 0) as signed) from records r where r.date >= #{weekStart}) as week_minutes,
               (select count(*) from users where created_at >= #{weekStart}) as week_new_users,
               (select count(*) from activity_routes) as route_count
             """)
@@ -32,7 +32,7 @@ public interface AdminStatsMapper {
     @Select("""
             select
               (select count(*) from records where user_id = #{userId}) as record_count,
-              (select cast(coalesce(sum(case when r.flagged = 1 then 0 when r.verified = 1 then r.duration else r.duration * 0.5 end), 0) as signed) from records r
+              (select cast(coalesce(sum(case when r.flagged = 1 then 0 else r.duration end), 0) as signed) from records r
                  where r.user_id = #{userId} and r.date >= #{weekStart}) as week_minutes,
               (select count(*) from activity_routes where user_id = #{userId}) as route_count
             """)

@@ -12,7 +12,7 @@ defineProps({
       </span>
       <span class="recent-record__main">
         <strong>{{ row.type }}</strong>
-        <small>{{ row.dateText }} · {{ row.duration }} 分钟</small>
+        <small>{{ row.dateText }} · {{ row.duration }} 分钟<span v-if="row.flagged"> · 审核中</span></small>
       </span>
       <span class="recent-record__cal">{{ row.calories }}<small>千卡</small></span>
     </div>

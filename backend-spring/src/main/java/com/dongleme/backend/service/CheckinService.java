@@ -75,7 +75,8 @@ public class CheckinService {
                 record.getDate(),
                 record.getDuration(),
                 record.getCalories(),
-                outcome.streak());
+                outcome.streak(),
+                record.getFlagged());
     }
 
     /**

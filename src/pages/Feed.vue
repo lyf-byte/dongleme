@@ -90,6 +90,7 @@ onMounted(load)
             <div class="feed-meta">
               <span class="chip chip--blue">{{ item.type }}</span>
               <span>{{ item.duration }} 分钟</span>
+              <span v-if="item.flagged === 1" class="feed-pending">审核中</span>
               <span>{{ item.calories }} 千卡</span>
             </div>
           </div>
@@ -194,6 +195,10 @@ onMounted(load)
   margin-top: 6px;
   font-size: 12px;
   color: var(--text-2);
+}
+
+.feed-pending {
+  color: var(--muted);
 }
 
 .empty-btn {

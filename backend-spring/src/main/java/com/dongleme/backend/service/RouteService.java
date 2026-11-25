@@ -154,7 +154,8 @@ public class RouteService {
                 date,
                 minutes,
                 outcome.record().getCalories(),
-                outcome.streak());
+                outcome.streak(),
+                outcome.record().getFlagged());
         return new RouteSaveResult(RouteSummaryView.of(route, objectMapper), checkin);
     }
 
