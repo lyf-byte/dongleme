@@ -190,6 +190,17 @@ function goCheckin(type) {
   router.push('/checkin')
 }
 
+// 跑步/快走/骑行直接用轨迹记录，其它运动仍走手动打卡
+const TRACK_SPORTS = ['跑步', '快走', '骑行']
+
+function pickSport(type) {
+  if (TRACK_SPORTS.includes(type)) {
+    router.push({ path: '/track', query: { type } })
+    return
+  }
+  goCheckin(type)
+}
+
 function refreshDate() {
   if (document.visibilityState === 'visible') {
     todayRef.value = new Date()
@@ -388,7 +399,7 @@ onUnmounted(() => {
         :sports="homeSports"
         :total="allSports.length"
         :has-more="hasMoreSports"
-        @pick="goCheckin"
+        @pick="pickSport"
       />
 
       <div class="home-actions">
