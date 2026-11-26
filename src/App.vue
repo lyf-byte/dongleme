@@ -1,11 +1,24 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { House, ChartBar, Trophy, Sparkles, User } from 'lucide-vue-next'
 import UiHost from './components/UiHost.vue'
 import ReminderBanner from './components/ReminderBanner.vue'
+import { connectRealtime, disconnectRealtime } from './utils/realtime'
 
 const route = useRoute()
+
+function syncRealtime(path) {
+  if (path.startsWith('/auth') || path.startsWith('/admin')) {
+    disconnectRealtime()
+  } else {
+    connectRealtime()
+  }
+}
+
+onMounted(() => syncRealtime(route.path))
+onUnmounted(disconnectRealtime)
+watch(() => route.path, syncRealtime)
 
 const tabs = [
   { label: '首页', path: '/', icon: House },
@@ -15,7 +28,16 @@ const tabs = [
   { label: '我的', path: '/mine', icon: User }
 ]
 
-const hiddenPrefixes = ['/checkin', '/auth', '/onboarding', '/track', '/timer', '/settings']
+const hiddenPrefixes = [
+  '/checkin',
+  '/auth',
+  '/onboarding',
+  '/track',
+  '/timer',
+  '/settings',
+  '/messages',
+  '/chat'
+]
 const isAdmin = computed(() => route.path.startsWith('/admin'))
 const showTabbar = computed(() => (
   !hiddenPrefixes.some((path) => route.path === path || route.path.startsWith(`${path}/`))

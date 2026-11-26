@@ -236,6 +236,72 @@ export async function getFeed() {
   return api.get('/follows/feed').then((res) => res.data)
 }
 
+export async function setContactRemark(targetId, remark) {
+  return api.put('/contacts/remark', { targetId, remark }).then((res) => res.data)
+}
+
+export async function setBlocked(targetId, blocked) {
+  return api.put('/contacts/block', { targetId, blocked }).then((res) => res.data)
+}
+
+export async function reportUser(targetId, reason) {
+  return api.post('/contacts/report', { targetId, reason }).then((res) => res.data)
+}
+
+export async function updateConversationSetting(peerId, patch) {
+  return api.put('/contacts/conversation', { peerId, ...patch }).then((res) => res.data)
+}
+
+export async function recallMessage(id) {
+  const result = await api.post(`/messages/${id}/recall`).then((res) => res.data)
+  clearApiCache()
+  return result
+}
+
+export async function getMutualFollows() {
+  return api.get('/follows/mutual').then((res) => res.data)
+}
+
+export async function getConversations() {
+  return api.get('/messages/conversations').then((res) => res.data)
+}
+
+export async function getChat(userId, beforeId) {
+  return api
+    .get('/messages', { params: { userId, beforeId: beforeId || undefined } })
+    .then((res) => res.data)
+}
+
+export async function sendMessage(receiverId, content, extra = {}) {
+  const result = await api
+    .post('/messages', { receiverId, content, ...extra })
+    .then((res) => res.data)
+  clearApiCache()
+  return result
+}
+
+export async function uploadImage(file) {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post('/uploads/image', form).then((res) => res.data)
+}
+
+export async function markChatRead(userId) {
+  return api.put('/messages/read', { userId }).then((res) => res.data)
+}
+
+export async function getUnread() {
+  return api.get('/messages/unread').then((res) => res.data)
+}
+
+export async function getNotifications() {
+  return api.get('/notifications').then((res) => res.data)
+}
+
+export async function markNotificationsRead(id) {
+  return api.put('/notifications/read', id ? { id } : {}).then((res) => res.data)
+}
+
 export async function updateProfile(payload) {
   const result = await api.put('/profile', payload).then((res) => res.data)
   clearApiCache()

@@ -19,6 +19,10 @@ spring:
     time-zone: Asia/Shanghai
     serialization:
       write-dates-as-timestamps: false
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
 
 mybatis-plus:
   configuration:
@@ -40,6 +44,8 @@ app:
     window-seconds: ${LOGIN_WINDOW_SECONDS:900}
   weather:
     amap-key: ${AMAP_KEY:}
+  upload:
+    dir: ${UPLOAD_DIR:uploads}
   android:
     # 正式包版本信息；发新版时同步修改这里并上传 APK
     version-code: ${APP_ANDROID_VERSION_CODE:2}

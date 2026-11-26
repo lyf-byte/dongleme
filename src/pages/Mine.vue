@@ -1,8 +1,15 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronRight, Flame, Route as RouteIcon, Settings, Users } from 'lucide-vue-next'
-import { getProfile, updateProfile, errorMessage } from '../utils/api'
+import {
+  ChevronRight,
+  Flame,
+  MessageCircle,
+  Route as RouteIcon,
+  Settings,
+  Users
+} from 'lucide-vue-next'
+import { getProfile, updateProfile, getUnread, errorMessage } from '../utils/api'
 import { getUser } from '../utils/auth'
 import { avatarFor } from '../utils/avatar'
 import { evaluateBadges, statsFromProfile } from '../utils/badges'
@@ -33,6 +40,11 @@ const totals = computed(() => [
   { label: '总消耗', value: profile.value?.total?.calories || 0, unit: '千卡' }
 ])
 
+const unread = ref({ messages: 0, notifications: 0 })
+const unreadTotal = computed(
+  () => (unread.value.messages || 0) + (unread.value.notifications || 0)
+)
+
 const unlockedIds = ref(new Set())
 const badges = computed(() =>
   evaluateBadges(statsFromProfile(profile.value)).map((badge) => ({
@@ -46,8 +58,12 @@ const activeBadge = ref(null)
 async function load() {
   loading.value = true
   try {
-    const data = await getProfile()
+    const [data, count] = await Promise.all([
+      getProfile(),
+      getUnread().catch(() => null)
+    ])
     profile.value = data
+    if (count) unread.value = count
     form.value = {
       nickname: data.nickname,
       gender: data.gender || 'secret',
@@ -164,6 +180,17 @@ onMounted(load)
           <span class="list-text">
             <strong>运动轨迹</strong>
             <small>查看跑步、快走、骑行记录</small>
+          </span>
+          <ChevronRight :size="18" class="chev" />
+        </button>
+        <button type="button" class="list-row" @click="router.push('/messages')">
+          <span class="list-icon list-icon--green"><MessageCircle :size="18" /></span>
+          <span class="list-text">
+            <strong>
+              消息
+              <span v-if="unreadTotal" class="msg-count">{{ unreadTotal > 99 ? '99+' : unreadTotal }}</span>
+            </strong>
+            <small>聊天与新的关注</small>
           </span>
           <ChevronRight :size="18" class="chev" />
         </button>
@@ -647,6 +674,26 @@ onMounted(load)
 .list-icon--violet {
   background: var(--violet-soft);
   color: var(--violet);
+}
+
+.list-icon--green {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.msg-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  margin-left: 4px;
+  border-radius: 8px;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: 1px;
 }
 
 .list-text {

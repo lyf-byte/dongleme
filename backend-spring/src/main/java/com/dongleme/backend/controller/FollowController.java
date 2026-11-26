@@ -33,6 +33,11 @@ public class FollowController {
         return followService.following(requireId(principal));
     }
 
+    @GetMapping("/mutual")
+    public List<FollowRow> mutual(@AuthenticationPrincipal AuthUser principal) {
+        return followService.mutual(requireId(principal));
+    }
+
     @GetMapping("/feed")
     public List<FollowFeedRow> feed(@AuthenticationPrincipal AuthUser principal) {
         return followService.feed(requireId(principal));

@@ -13,6 +13,8 @@ public class FollowFeedRow {
 
     private String nickname;
 
+    private String remark;
+
     private String gender;
 
     private LocalDate date;

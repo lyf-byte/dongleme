@@ -22,14 +22,23 @@ public class FollowService {
 
     private final FollowMapper followMapper;
     private final UserMapper userMapper;
+    private final NotificationService notificationService;
 
-    public FollowService(FollowMapper followMapper, UserMapper userMapper) {
+    public FollowService(
+            FollowMapper followMapper,
+            UserMapper userMapper,
+            NotificationService notificationService) {
         this.followMapper = followMapper;
         this.userMapper = userMapper;
+        this.notificationService = notificationService;
     }
 
     public List<FollowRow> following(String userId) {
         return followMapper.selectFollowing(userId, ShanghaiTime.weekStart(ShanghaiTime.today()));
+    }
+
+    public List<FollowRow> mutual(String userId) {
+        return followMapper.selectMutual(userId);
     }
 
     public List<FollowFeedRow> feed(String userId) {
@@ -58,6 +67,7 @@ public class FollowService {
         } catch (DuplicateKeyException ignored) {
             // 重复关注按成功处理
         }
+        notificationService.notifyFollow(userId, targetId);
         return Map.of("ok", true);
     }
 

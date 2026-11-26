@@ -45,6 +45,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth").permitAll()
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/app/version", "/api/app/download").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/messages/stream").permitAll()
                         .requestMatchers("/api/admin", "/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(handler -> handler

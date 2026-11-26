@@ -130,7 +130,85 @@ CREATE TABLE IF NOT EXISTS follows (
   CONSTRAINT fk_follows_followee FOREIGN KEY (followee_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
+CREATE TABLE IF NOT EXISTS messages (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  sender_id CHAR(36) NOT NULL,
+  receiver_id CHAR(36) NOT NULL,
+  type VARCHAR(16) NOT NULL DEFAULT 'text',
+  content VARCHAR(500) NOT NULL,
+  media_url VARCHAR(255) NULL,
+  payload_json TEXT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  read_at DATETIME NULL,
+  recalled_at DATETIME NULL,
+  sender_deleted TINYINT NOT NULL DEFAULT 0,
+  receiver_deleted TINYINT NOT NULL DEFAULT 0,
+  KEY idx_messages_pair_time (sender_id, receiver_id, created_at),
+  KEY idx_messages_receiver_unread (receiver_id, read_at),
+  CONSTRAINT fk_messages_sender FOREIGN KEY (sender_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_messages_receiver FOREIGN KEY (receiver_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id CHAR(36) NOT NULL,
+  actor_id CHAR(36) NULL,
+  type VARCHAR(16) NOT NULL,
+  content VARCHAR(200) NULL,
+  read_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_notifications_user (user_id, read_at, created_at),
+  CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_notifications_actor FOREIGN KEY (actor_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS contact_remarks (
+  owner_id CHAR(36) NOT NULL,
+  target_id CHAR(36) NOT NULL,
+  remark VARCHAR(20) NOT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (owner_id, target_id),
+  CONSTRAINT fk_remarks_owner FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_remarks_target FOREIGN KEY (target_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS user_blocks (
+  owner_id CHAR(36) NOT NULL,
+  target_id CHAR(36) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (owner_id, target_id),
+  CONSTRAINT fk_blocks_owner FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_blocks_target FOREIGN KEY (target_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS user_reports (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  reporter_id CHAR(36) NOT NULL,
+  target_id CHAR(36) NOT NULL,
+  reason VARCHAR(200) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_reports_target (target_id, created_at),
+  CONSTRAINT fk_reports_reporter FOREIGN KEY (reporter_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_reports_target FOREIGN KEY (target_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE TABLE IF NOT EXISTS conversation_settings (
+  owner_id CHAR(36) NOT NULL,
+  peer_id CHAR(36) NOT NULL,
+  pinned TINYINT NOT NULL DEFAULT 0,
+  muted TINYINT NOT NULL DEFAULT 0,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (owner_id, peer_id),
+  CONSTRAINT fk_settings_owner FOREIGN KEY (owner_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT fk_settings_peer FOREIGN KEY (peer_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
 -- 迁移（已有库执行一次）：
 -- ALTER TABLE records ADD COLUMN source VARCHAR(16) NOT NULL DEFAULT 'manual', ADD COLUMN verified TINYINT NOT NULL DEFAULT 0, ADD COLUMN flagged TINYINT NOT NULL DEFAULT 0;
 -- ALTER TABLE summaries ADD COLUMN plan_goal INT NULL;
 -- ALTER TABLE users ADD COLUMN next_weekly_goal INT NULL, ADD COLUMN next_goal_week DATE NULL;
+-- CREATE TABLE IF NOT EXISTS messages (见上方完整定义);
+-- CREATE TABLE IF NOT EXISTS notifications (见上方完整定义);
+-- CREATE TABLE IF NOT EXISTS contact_remarks (见上方完整定义);
+-- ALTER TABLE messages ADD COLUMN type VARCHAR(16) NOT NULL DEFAULT 'text', ADD COLUMN media_url VARCHAR(255) NULL, ADD COLUMN payload_json TEXT NULL, ADD COLUMN recalled_at DATETIME NULL;
+-- CREATE TABLE IF NOT EXISTS user_blocks / user_reports / conversation_settings (见上方完整定义);

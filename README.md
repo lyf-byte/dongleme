@@ -1,6 +1,6 @@
 # 动了么
 
-校园运动打卡全栈应用：Web / PWA / Android 三端，记录运动、连续打卡、周榜排行、GPS 轨迹，并用 AI 生成每周小结，配套管理后台与产品官网。
+校园运动打卡全栈应用：Web / PWA / Android 三端，记录运动、连续打卡、周榜排行、GPS 轨迹，并用 AI 生成每周小结；配套消息中心与私信、管理后台与产品官网。
 
 ## 技术栈
 
@@ -28,6 +28,8 @@
 - 打卡 / 轨迹 / 周小结海报
 - 资料编辑、修改密码、数据导出、清空数据、退出登录
 - 后台管理：概览、用户、打卡记录、轨迹、排行榜、异常打卡审核
+- 消息中心与私信：只有相互关注才能聊天，支持文字、图片、拍摄、位置与运动海报卡片，2 分钟内可撤回，图片可全屏预览
+- 会话能力：未读角标、置顶、免打扰、联系人备注、拉黑与举报；Web 端 SSE 实时推送，Android 端 5 秒轮询并同步桌面角标
 - 产品官网与 Android 客户端，Android 更新包支持断点续传
 
 ## 本地启动
@@ -132,6 +134,9 @@ git checkout archive/node-backend -- server/
 - `summaries`：每周 AI 小结缓存与重新生成次数
 - `custom_sports`：用户自定义运动及 MET 值
 - `activity_routes`：GPS 运动轨迹、降采样缩略图与统计
+- `messages` / `notifications`：私信消息、图片/位置/运动卡片与消息中心通知
+- `contact_remarks` / `conversation_settings`：联系人备注、会话置顶与免打扰
+- `user_blocks` / `user_reports`：拉黑关系与举报记录
 
 所有日期按 `Asia/Shanghai` 生成，数据库只存 `DATE` / `DATETIME`。
 
@@ -231,6 +236,8 @@ mysqldump -u dlm -p donglemei > /opt/donglemei/backup-$(date +%F).sql
 - MySQL 只监听 127.0.0.1，仅 EC2 本机可访问；应用账号只有 `SELECT/INSERT/UPDATE/DELETE`，没有 DDL 权限
 - Caddy 配置 CSP、`X-Content-Type-Options`、`Referrer-Policy`
 - 生产环境同源部署，后端默认不发送任何 CORS 放行头；只有显式配置 `CORS_ALLOWED_ORIGINS` 才放行指定来源
+- 私信仅允许互关用户发送，服务端校验拉黑关系与频率（10 秒最多 5 条）；聊天图片限制 5MB 与常见格式，按内容哈希命名
+- 位置与运动卡片必须携带合法的结构化数据，位置坐标会做经纬度范围校验
 
 ## 前端结构约定
 

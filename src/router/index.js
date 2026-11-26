@@ -25,6 +25,12 @@ const routes = [
   { path: '/stats', name: 'stats', component: () => import('../pages/Stats.vue') },
   { path: '/rank', name: 'rank', component: () => import('../pages/Rank.vue') },
   { path: '/feed', name: 'feed', component: () => import('../pages/Feed.vue') },
+  { path: '/messages', name: 'messages', component: () => import('../pages/Messages.vue') },
+  {
+    path: '/chat/:userId',
+    name: 'chat',
+    component: () => import('../pages/Chat.vue')
+  },
   { path: '/summary', name: 'summary', component: () => import('../pages/Summary.vue') },
   { path: '/mine', name: 'mine', component: () => import('../pages/Mine.vue') },
   { path: '/settings', name: 'settings', component: () => import('../pages/Settings.vue') },

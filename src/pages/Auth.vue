@@ -128,6 +128,7 @@ async function onSubmit() {
           <Leaf :size="14" />
           AI 小结
         </span>
+        <a class="auth-tag auth-tag--site" href="https://dongleme.xyz">返回官网</a>
       </div>
     </header>
 
@@ -351,6 +352,12 @@ async function onSubmit() {
   white-space: nowrap;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+
+.auth-tag--site {
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--blue);
+  text-decoration: none;
 }
 
 .auth-tag--blue {

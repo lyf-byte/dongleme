@@ -14,6 +14,10 @@ const loading = ref(true)
 const items = ref([])
 const followingCount = ref(0)
 
+function displayName(item) {
+  return item.remark || item.nickname || '运动新人'
+}
+
 function formatDate(value) {
   if (!value) return ''
   const today = todayShanghai()
@@ -72,7 +76,13 @@ onMounted(load)
 
     <template v-else-if="items.length">
       <div class="card feed-list">
-        <div v-for="item in items" :key="item.id" class="feed-row">
+        <button
+          v-for="item in items"
+          :key="item.id"
+          type="button"
+          class="feed-row"
+          @click="router.push(`/chat/${item.userId}`)"
+        >
           <span class="feed-avatar">
             <img
               v-if="avatarFor(item.gender)"
@@ -80,11 +90,11 @@ onMounted(load)
               alt=""
               class="feed-avatar__img"
             />
-            <template v-else>{{ (item.nickname || '动').slice(0, 1) }}</template>
+            <template v-else>{{ displayName(item).slice(0, 1) }}</template>
           </span>
           <div class="feed-body">
             <div class="feed-head">
-              <strong>{{ item.nickname || '运动新人' }}</strong>
+              <strong>{{ displayName(item) }}</strong>
               <span>{{ formatDate(item.date) }}</span>
             </div>
             <div class="feed-meta">
@@ -94,7 +104,7 @@ onMounted(load)
               <span>{{ item.calories }} 千卡</span>
             </div>
           </div>
-        </div>
+        </button>
       </div>
     </template>
 
@@ -130,10 +140,19 @@ onMounted(load)
 }
 
 .feed-row {
+  width: 100%;
   display: flex;
   gap: 12px;
   padding: 14px 0;
+  border: 0;
   border-top: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.feed-row:active {
+  background: var(--surface-2);
 }
 
 .feed-row:first-child {
