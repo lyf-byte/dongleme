@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.dongleme.backend.dto.AdminNewUserRow;
 import com.dongleme.backend.dto.AdminUserRow;
 import com.dongleme.backend.dto.RankRow;
+import com.dongleme.backend.dto.UserSearchRow;
 import com.dongleme.backend.entity.User;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -30,6 +31,36 @@ public interface UserMapper extends BaseMapper<User> {
             + "group by u.id, u.nickname, u.gender "
             + "order by weekly_minutes desc, u.nickname asc")
     List<RankRow> selectTotalRank();
+
+    /**
+     * 昵称模糊搜索；手机号、邮箱、账号名只做完整匹配，避免通过片段枚举账号。
+     * 排除自己，以及双方任一方向已拉黑的用户。
+     */
+    @Select("""
+            select u.id, u.nickname, u.gender, cr.remark,
+                   (exists(select 1 from follows f
+                            where f.follower_id = #{me} and f.followee_id = u.id)) as is_following,
+                   (exists(select 1 from follows b
+                            where b.follower_id = u.id and b.followee_id = #{me})) as follows_me
+            from users u
+            left join contact_remarks cr on cr.owner_id = #{me} and cr.target_id = u.id
+            where u.id <> #{me}
+              and (u.nickname like concat('%', #{keyword}, '%')
+                   or u.phone = #{keyword}
+                   or u.email = #{keyword}
+                   or u.username = #{keyword})
+              and not exists (select 1 from user_blocks b1
+                              where b1.owner_id = #{me} and b1.target_id = u.id)
+              and not exists (select 1 from user_blocks b2
+                              where b2.owner_id = u.id and b2.target_id = #{me})
+            order by case when u.phone = #{keyword} or u.email = #{keyword}
+                               or u.username = #{keyword} then 0 else 1 end,
+                     u.nickname asc
+            limit 20
+            """)
+    List<UserSearchRow> searchUsers(
+            @Param("me") String me,
+            @Param("keyword") String keyword);
 
     @Select("""
             select count(*) from users where created_at >= #{from}

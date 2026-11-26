@@ -1,7 +1,15 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, BellOff, ChevronRight, MoreHorizontal, Pin } from 'lucide-vue-next'
+import {
+  ArrowLeft,
+  BellOff,
+  ChevronRight,
+  MoreHorizontal,
+  Pin,
+  Search,
+  X
+} from 'lucide-vue-next'
 import {
   getConversations,
   getMutualFollows,
@@ -10,6 +18,7 @@ import {
   markNotificationsRead,
   updateConversationSetting,
   followUser,
+  searchUsers,
   errorMessage
 } from '../utils/api'
 import { avatarFor } from '../utils/avatar'
@@ -23,9 +32,15 @@ const mutuals = ref([])
 const notices = ref([])
 const unread = ref({ messages: 0, notifications: 0 })
 const convMenu = ref(null)
+const searchKeyword = ref('')
+const searchResults = ref([])
+const searching = ref(false)
 let timer = 0
 let offs = []
+let searchTimer = 0
+let searchSeq = 0
 
+const showSearch = computed(() => searchKeyword.value.trim().length > 0)
 const mutualIds = computed(() => new Set(mutuals.value.map((item) => item.id)))
 const mutualChats = computed(() => {
   const chatting = new Set(conversations.value.map((item) => item.userId))
@@ -83,6 +98,63 @@ async function handleFollow(notice) {
   }
 }
 
+function searchHint(item) {
+  if (item.isFollowing && item.followsMe) return '已互关，可以聊天'
+  if (item.isFollowing) return '已关注，等待对方回关'
+  if (item.followsMe) return '关注了你，回关后可以聊天'
+  return '还没有关注'
+}
+
+async function runSearch() {
+  const keyword = searchKeyword.value.trim()
+  if (!keyword) {
+    searchResults.value = []
+    searching.value = false
+    return
+  }
+  const seq = ++searchSeq
+  searching.value = true
+  try {
+    const rows = await searchUsers(keyword)
+    if (seq !== searchSeq) return
+    searchResults.value = rows || []
+  } catch (error) {
+    if (seq === searchSeq) {
+      searchResults.value = []
+      toast(errorMessage(error, '搜索失败'))
+    }
+  } finally {
+    if (seq === searchSeq) searching.value = false
+  }
+}
+
+watch(searchKeyword, () => {
+  window.clearTimeout(searchTimer)
+  searchSeq++
+  const keyword = searchKeyword.value.trim()
+  if (!keyword) {
+    searchResults.value = []
+    searching.value = false
+    return
+  }
+  searchTimer = window.setTimeout(runSearch, 350)
+})
+
+function clearSearch() {
+  searchKeyword.value = ''
+}
+
+async function followFromSearch(item) {
+  try {
+    await followUser(item.id)
+    item.isFollowing = true
+    toast(item.followsMe ? '已回关' : '已关注')
+    if (item.followsMe) load(true)
+  } catch (error) {
+    toast(errorMessage(error, '关注失败'))
+  }
+}
+
 async function togglePin(item) {
   try {
     await updateConversationSetting(item.userId, { pinned: !item.pinned })
@@ -119,6 +191,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.clearInterval(timer)
+  window.clearTimeout(searchTimer)
   offs.forEach((off) => off())
 })
 </script>
@@ -131,7 +204,28 @@ onUnmounted(() => {
       </button>
       <h1>消息</h1>
     </header>
-    <p class="messages-tip">相互关注后才能互发消息</p>
+
+    <div class="user-search">
+      <Search :size="16" class="user-search__icon" />
+      <input
+        v-model="searchKeyword"
+        type="search"
+        maxlength="50"
+        placeholder="搜索昵称、手机号或邮箱"
+      />
+      <button
+        v-if="searchKeyword"
+        type="button"
+        class="user-search__clear"
+        aria-label="清空搜索"
+        @click="clearSearch"
+      >
+        <X :size="15" />
+      </button>
+    </div>
+
+    <template v-if="!showSearch">
+      <p class="messages-tip">相互关注后才能互发消息</p>
 
     <div v-if="visibleNotices.length" class="card notice-card">
       <div v-for="notice in visibleNotices" :key="notice.id" class="notice-row">
@@ -244,6 +338,58 @@ onUnmounted(() => {
         </button>
       </div>
     </template>
+    </template>
+
+    <template v-else>
+      <div class="section-title">
+        <h2>搜索结果</h2>
+        <span>{{ searching ? '搜索中…' : `${searchResults.length} 人` }}</span>
+      </div>
+      <div v-if="searchResults.length" class="card msg-list">
+        <div
+          v-for="item in searchResults"
+          :key="item.id"
+          class="msg-row"
+          role="button"
+          tabindex="0"
+          @click="router.push(`/chat/${item.id}`)"
+          @keydown.enter="router.push(`/chat/${item.id}`)"
+        >
+          <span class="msg-avatar">
+            <img v-if="avatarFor(item.gender)" :src="avatarFor(item.gender)" alt="" class="msg-avatar__img" />
+            <template v-else>{{ displayName(item).slice(0, 1) }}</template>
+          </span>
+          <span class="msg-body">
+            <span class="msg-head">
+              <strong>{{ displayName(item) }}</strong>
+            </span>
+            <span class="msg-preview">{{ searchHint(item) }}</span>
+          </span>
+          <button
+            v-if="item.isFollowing && item.followsMe"
+            type="button"
+            class="chat-cta"
+            @click.stop="router.push(`/chat/${item.id}`)"
+          >
+            发消息
+          </button>
+          <span v-else-if="item.isFollowing" class="notice-mutual">已关注</span>
+          <button
+            v-else
+            type="button"
+            class="btn-primary btn-sm"
+            @click.stop="followFromSearch(item)"
+          >
+            {{ item.followsMe ? '回关' : '关注' }}
+          </button>
+          <ChevronRight :size="16" class="chev" />
+        </div>
+      </div>
+      <div v-else-if="!searching" class="card empty-state">
+        <h3>没有找到相关用户</h3>
+        <p>试试完整手机号、邮箱，或换一个昵称。</p>
+      </div>
+    </template>
 
     <transition name="ui">
       <div v-if="convMenu" class="conv-overlay" @click.self="convMenu = null">
@@ -276,6 +422,49 @@ onUnmounted(() => {
   margin: 0 0 8px;
   font-size: 11px;
   color: var(--muted);
+}
+
+.user-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  margin-bottom: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.user-search__icon {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.user-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.user-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.user-search__clear {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
 }
 
 .loading-card {

@@ -262,6 +262,12 @@ export async function getMutualFollows() {
   return api.get('/follows/mutual').then((res) => res.data)
 }
 
+export async function searchUsers(keyword) {
+  return api
+    .get('/users/search', { params: { keyword } })
+    .then((res) => res.data)
+}
+
 export async function getConversations() {
   return api.get('/messages/conversations').then((res) => res.data)
 }

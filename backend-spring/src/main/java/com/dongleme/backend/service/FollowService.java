@@ -5,6 +5,7 @@ import com.dongleme.backend.common.ApiException;
 import com.dongleme.backend.common.ShanghaiTime;
 import com.dongleme.backend.dto.FollowFeedRow;
 import com.dongleme.backend.dto.FollowRow;
+import com.dongleme.backend.dto.UserSearchRow;
 import com.dongleme.backend.entity.Follow;
 import com.dongleme.backend.mapper.FollowMapper;
 import com.dongleme.backend.mapper.UserMapper;
@@ -46,6 +47,17 @@ public class FollowService {
                 userId,
                 ShanghaiTime.today().minusDays(FEED_DAYS),
                 FEED_LIMIT);
+    }
+
+    public List<UserSearchRow> searchUsers(String userId, String keyword) {
+        String query = keyword == null ? "" : keyword.trim();
+        if (query.isEmpty()) {
+            return List.of();
+        }
+        if (query.length() > 50) {
+            throw ApiException.badRequest("搜索内容过长");
+        }
+        return userMapper.searchUsers(userId, query);
     }
 
     public Map<String, Object> follow(String userId, String targetId) {
