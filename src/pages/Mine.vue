@@ -12,7 +12,7 @@ import {
 import { getProfile, updateProfile, getUnread, errorMessage } from '../utils/api'
 import { getUser } from '../utils/auth'
 import { avatarFor } from '../utils/avatar'
-import { evaluateBadges, statsFromProfile } from '../utils/badges'
+import { evaluateBadges, statsFromProfile, TIERS } from '../utils/badges'
 import { syncBadges } from '../composables/useBadges'
 import { toast } from '../utils/ui'
 
@@ -47,10 +47,17 @@ const unreadTotal = computed(
 
 const unlockedIds = ref(new Set())
 const badges = computed(() =>
-  evaluateBadges(statsFromProfile(profile.value)).map((badge) => ({
-    ...badge,
-    earned: badge.earned || unlockedIds.value.has(badge.id)
-  }))
+  evaluateBadges(statsFromProfile(profile.value)).map((badge) => {
+    // 服务端已解锁的历史勋章可能已不满足当前统计，必须补上档位样式，避免模板读取空值导致整页渲染失败
+    const earned = badge.earned || unlockedIds.value.has(badge.id)
+    return {
+      ...badge,
+      earned,
+      tierStyle: earned ? (badge.tierStyle || TIERS.bronze) : null,
+      percent: earned ? 100 : badge.percent,
+      current: earned ? badge.target : badge.current
+    }
+  })
 )
 const earnedCount = computed(() => badges.value.filter((item) => item.earned).length)
 const activeBadge = ref(null)
@@ -220,19 +227,25 @@ onMounted(load)
         >
           <span
             class="badge-icon"
-            :style="badge.earned ? { background: badge.tierStyle.soft, color: badge.tierStyle.color } : null"
+            :style="badge.earned && badge.tierStyle
+              ? { background: badge.tierStyle.soft, color: badge.tierStyle.color }
+              : null"
           >
             <component :is="badge.icon" :size="17" />
           </span>
           <strong>{{ badge.name }}</strong>
           <small>
-            {{ badge.earned ? badge.tierStyle.label + '章' : badge.current + ' / ' + badge.target }}
+            {{ badge.earned
+              ? (badge.tierStyle ? badge.tierStyle.label + '章' : '已解锁')
+              : badge.current + ' / ' + badge.target }}
           </small>
           <span class="badge-meter">
             <i
               :style="{
                 width: badge.percent + '%',
-                background: badge.earned ? badge.tierStyle.color : 'var(--blue)'
+                background: badge.earned && badge.tierStyle
+                  ? badge.tierStyle.color
+                  : 'var(--blue)'
               }"
             ></i>
           </span>
@@ -245,7 +258,7 @@ onMounted(load)
             <span
               class="badge-sheet__icon"
               :class="{ earned: activeBadge.earned }"
-              :style="activeBadge.earned
+              :style="activeBadge.earned && activeBadge.tierStyle
                 ? { background: activeBadge.tierStyle.soft, color: activeBadge.tierStyle.color }
                 : null"
             >
